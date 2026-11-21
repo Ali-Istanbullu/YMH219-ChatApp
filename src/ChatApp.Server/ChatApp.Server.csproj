@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Sunucunun butun mantigi: TCP + TLS, hesaplar, mesajlar, engelleme, yonetim, PostgreSQL.
+       Pencere (WinForms) icermez: ileride Linux'ta penceresiz de calisabilsin diye. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChatApp.Protocol\ChatApp.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="10.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChatApp.UnitTests" />
+  </ItemGroup>
+
+</Project>

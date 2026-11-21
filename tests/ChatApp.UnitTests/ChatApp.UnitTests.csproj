@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Birim testleri: protokol ve sunucu mantigi. Veritabani yerine bellekte calisan sahte depolar,
+       gercek ag yerine sahte oturumlar kullanilir. Bir de gercek TLS ile localhost uzerinden uctan uca test var. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" Version="4.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ChatApp.Protocol\ChatApp.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\ChatApp.Server\ChatApp.Server.csproj" />
+  </ItemGroup>
+
+</Project>
