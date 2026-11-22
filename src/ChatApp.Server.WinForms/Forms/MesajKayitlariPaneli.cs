@@ -25,6 +25,9 @@ public sealed class MesajKayitlariPaneli : UserControl
     private readonly Button _dahaEskiButonu;
     private readonly Button _yasaklaButonu;
 
+    private const int SilmeSutunu = 4;
+    private const int SilmeSutunuEnAz = 220;
+
     private KullaniciKaydi? _kullanici;
     private int? _karsiId;        // null: Genel oda
     private bool _genelGosteriliyor;
@@ -67,7 +70,7 @@ public sealed class MesajKayitlariPaneli : UserControl
         _sohbetListesi.SelectedIndexChanged += async (_, _) => await SecilenSohbetiGosterAsync();
 
         // ---- Sag: mesajlar ----
-        _mesajListesi = Liste(("Zaman", 120), ("Gönderen", 110), ("Mesaj", 330), ("Durum", 80), ("Silme", 200));
+        _mesajListesi = Liste(("Zaman", 120), ("Gönderen", 110), ("Mesaj", 330), ("Durum", 80), ("Silme", SilmeSutunuEnAz));
         _mesajListesi.Dock = DockStyle.Fill;
         _mesajListesi.SelectedIndexChanged += (_, _) => SecilenMesajiGoster();
         _mesajMetni = new TextBox { Dock = DockStyle.Bottom, Height = 70, Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical };
@@ -169,6 +172,12 @@ public sealed class MesajKayitlariPaneli : UserControl
             {
                 _mesajListesi.Items.Add(Satir(kayit));
             }
+            // Iki kisi de sildiyse yazi uzar: sutun icerige gore genisler, kesilmez.
+            _mesajListesi.AutoResizeColumn(SilmeSutunu, ColumnHeaderAutoResizeStyle.ColumnContent);
+            if (_mesajListesi.Columns[SilmeSutunu].Width < SilmeSutunuEnAz)
+            {
+                _mesajListesi.Columns[SilmeSutunu].Width = SilmeSutunuEnAz;
+            }
             _mesajListesi.EndUpdate();
             if (oncekiMesajId is null && _mesajListesi.Items.Count > 0)
             {
@@ -197,9 +206,14 @@ public sealed class MesajKayitlariPaneli : UserControl
 
     private void SecilenMesajiGoster()
     {
-        _mesajMetni.Text = _mesajListesi.SelectedItems.Count > 0 && _mesajListesi.SelectedItems[0].Tag is YonetimMesajKaydi kayit
-            ? kayit.Mesaj.Metin
-            : string.Empty;
+        if (_mesajListesi.SelectedItems.Count == 0 || _mesajListesi.SelectedItems[0].Tag is not YonetimMesajKaydi kayit)
+        {
+            _mesajMetni.Clear();
+            return;
+        }
+        string silme = SilmeBilgisi(kayit);
+        _mesajMetni.Text = kayit.Mesaj.Metin.ReplaceLineEndings("\r\n")
+            + (silme.Length > 0 ? $"\r\n\r\n[Silme: {silme}]" : string.Empty);
     }
 
     // ============================ Yardimcilar ============================
@@ -209,7 +223,20 @@ public sealed class MesajKayitlariPaneli : UserControl
         KayitliMesaj m = kayit.Mesaj;
         string durum = m.AliciId is null ? "-" : m.Durum.ToString();
         string metin = m.Metin.ReplaceLineEndings(" ⏎ ");
+        string silme = SilmeBilgisi(kayit);
 
+        var satir = new ListViewItem(new[] { Saat(m.GonderimZamani), m.GonderenAd, metin, durum, silme }) { Tag = kayit };
+        if (silme.Length > 0)
+        {
+            satir.ForeColor = Color.Firebrick;   // silinmis/gizlenmis: dikkat ceksin
+        }
+        return satir;
+    }
+
+    // Ornek: "gönderen herkesten sildi · Ali kendinden sildi · Ayşe kendinden sildi"
+    private string SilmeBilgisi(YonetimMesajKaydi kayit)
+    {
+        KayitliMesaj m = kayit.Mesaj;
         var silme = new List<string>();
         if (m.HerkestenSilindi)
         {
@@ -225,12 +252,7 @@ public sealed class MesajKayitlariPaneli : UserControl
             }
         }
 
-        var satir = new ListViewItem(new[] { Saat(m.GonderimZamani), m.GonderenAd, metin, durum, string.Join(", ", silme) }) { Tag = kayit };
-        if (silme.Count > 0)
-        {
-            satir.ForeColor = Color.Firebrick;   // silinmis/gizlenmis: dikkat ceksin
-        }
-        return satir;
+        return string.Join(" · ", silme);
     }
 
     private string Ad(int kullaniciId) =>

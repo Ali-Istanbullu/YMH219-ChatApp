@@ -28,6 +28,9 @@ public sealed class GomuluPostgres
     private const string SifreKarakterleri = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
     private static readonly TimeSpan IslemZamanAsimi = TimeSpan.FromSeconds(90);
 
+    // Windows: program bir DLL'ini bulamadi (STATUS_DLL_NOT_FOUND). PostgreSQL'de genelde eksik Visual C++ calisma zamani.
+    private const int DllBulunamadi = unchecked((int)0xC0000135);
+
     private readonly string _binKlasoru;
     private readonly string _veriKlasoru;
     private readonly string _logDosyasi;
@@ -217,10 +220,17 @@ public sealed class GomuluPostgres
             }
 
             string tumCikti = $"{await cikti}\n{await hataCiktisi}".Trim();
+            if (surec.ExitCode == DllBulunamadi)
+            {
+                // Gelistiricinin bilgisayarinda olup temiz Windows'ta olmayabilecek bilesen: anlasilir mesaj.
+                throw new GomuluVeritabaniHatasi(
+                    "PostgreSQL için gerekli bir Windows bileşeni eksik (Microsoft Visual C++ 2015-2022 çalışma zamanı, x64). " +
+                    "ChatServer'ı kurulum dosyasıyla yeniden kurun; kurulum bu bileşeni kendisi kurar.", tumCikti);
+            }
             if (hataVer && surec.ExitCode != 0)
             {
-                throw new GomuluVeritabaniHatasi($"PostgreSQL programı ({program}) başarısız oldu (çıkış kodu {surec.ExitCode}).",
-                    $"{tumCikti}\n{LogSonu()}".Trim());
+                throw new GomuluVeritabaniHatasi($"PostgreSQL programı ({program}) başarısız oldu (çıkış kodu {surec.ExitCode})." +
+                    YolIpucu(), $"{tumCikti}\n{LogSonu()}".Trim());
             }
             return (surec.ExitCode, tumCikti);
         }
@@ -240,6 +250,14 @@ public sealed class GomuluPostgres
             return string.Empty;   // log okunamadi; asil hata mesaji yine gosterilir
         }
     }
+
+    // Windows kullanici klasorunun yolunda ozel karakter varsa (ornek: Ingilizce Windows'ta "Şükrü"),
+    // PostgreSQL bu yolu okuyamayabilir. Hata mesajina bu ihtimal eklenir.
+    private string YolIpucu() =>
+        _veriKlasoru.Any(c => c > 127)
+            ? $"\nNot: Veritabanı klasörünün yolunda Türkçe/özel karakter var ({_veriKlasoru}); PostgreSQL bazı Windows " +
+              "dil ayarlarında böyle yolları okuyamaz. Bu durumda \"Kendi PostgreSQL'imi kullanacağım\" seçeneğini kullanın."
+            : string.Empty;
 
     // 5434'ten baslayarak bu bilgisayarda bos olan ilk port.
     private static int BosPortBul()
