@@ -48,11 +48,12 @@ public sealed class MesajKayitlariPaneli : UserControl
         Button genelButonu = Buton("Genel odayı göster", async () => await GenelGosterAsync());
         _yasaklaButonu = Buton("Bu kullanıcıyı yasakla...", async () => await YasaklaAsync());
         _yasaklaButonu.Enabled = false;
+        Button yenileButonu = Buton("Yenile", async () => await YenileAsync());
         _kullaniciYazisi = new Label { AutoSize = true, Font = new Font(Font, FontStyle.Bold), Margin = new Padding(12, 8, 3, 3) };
         var ust = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, Padding = new Padding(4) };
         ust.Controls.AddRange([
             new Label { Text = "Kullanıcı (ID ya da kullanıcı adı):", AutoSize = true, Margin = new Padding(3, 8, 3, 3) },
-            _aramaKutusu, gosterButonu, genelButonu, _yasaklaButonu, _kullaniciYazisi
+            _aramaKutusu, gosterButonu, genelButonu, _yasaklaButonu, yenileButonu, _kullaniciYazisi
         ]);
         _aramaKutusu.KeyDown += async (_, e) =>
         {
@@ -88,11 +89,38 @@ public sealed class MesajKayitlariPaneli : UserControl
         Controls.Add(ust);
     }
 
+    // Bu panelden biri yasaklandi: ana pencere "Yasaklılar" listesini yenilesin.
+    public event Action? KullaniciYasaklandi;
+
     // ============================ Islemler ============================
 
-    private async Task KullaniciGosterAsync()
+    private Task KullaniciGosterAsync() => KullaniciYukleAsync(_aramaKutusu.Text.Trim());
+
+    // Ekranda ne varsa (kullanici + secili sohbet ya da Genel oda) veritabanindan yeniden okunur.
+    private async Task YenileAsync()
     {
-        string aranan = _aramaKutusu.Text.Trim();
+        bool genel = _genelGosteriliyor;
+        int? karsiId = _karsiId;
+        if (_kullanici is { } kullanici)
+        {
+            await KullaniciYukleAsync(kullanici.Id.ToString());
+        }
+        if (genel)
+        {
+            await GenelGosterAsync();
+            return;
+        }
+        ListViewItem? satir = _sohbetListesi.Items.Cast<ListViewItem>()
+            .FirstOrDefault(s => s.Tag is YonetimSohbetOzeti o && o.KarsiId == karsiId);
+        if (satir is not null)
+        {
+            satir.Selected = true;   // secim degisince mesajlar yuklenir
+            satir.EnsureVisible();
+        }
+    }
+
+    private async Task KullaniciYukleAsync(string aranan)
+    {
         if (aranan.Length == 0)
         {
             return;
@@ -200,7 +228,8 @@ public sealed class MesajKayitlariPaneli : UserControl
         await VeritabaniIslemiAsync(async () =>
         {
             await _yonetim.YasaklaAsync(kullanici.Id, sebep);
-            await KullaniciGosterAsync();
+            await KullaniciYukleAsync(kullanici.Id.ToString());
+            KullaniciYasaklandi?.Invoke();
         });
     }
 

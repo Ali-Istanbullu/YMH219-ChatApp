@@ -56,7 +56,7 @@ public sealed class SohbetPaneli : UserControl
         Dock = DockStyle.Fill;
 
         // ---- Sol ----
-        _benYazisi = new Label { Dock = DockStyle.Top, Height = 48, Padding = new Padding(8, 6, 8, 0), Font = new Font("Segoe UI", 10f, FontStyle.Bold) };
+        _benYazisi = new Label { Dock = DockStyle.Top, Height = 70, Padding = new Padding(8, 6, 8, 0), Font = new Font("Segoe UI", 10f, FontStyle.Bold) };
         _sohbetListesi = new ListBox
         {
             Dock = DockStyle.Fill,
@@ -187,7 +187,7 @@ public sealed class SohbetPaneli : UserControl
             return;
         }
 
-        _benYazisi.Text = $"{durum.BenimAdim}\nID: {durum.BenimId}  (bu numarayı paylaşın)";
+        _benYazisi.Text = $"{durum.BenimAdim}\nID: {durum.BenimId}\n(bu numarayı paylaşın)";   // tek satirda sigmiyordu
         ListeyiCiz(durum);
 
         Sohbet? acik = _yonetici.AcikSohbet;

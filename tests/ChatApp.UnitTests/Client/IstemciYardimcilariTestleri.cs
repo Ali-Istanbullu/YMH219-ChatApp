@@ -33,6 +33,56 @@ public sealed class IstemciYardimcilariTestleri
         Assert.IsFalse(SunucuAdresi.TryParse(metin, out _));
     }
 
+    private const string OrnekParmakIzi = "D98C1EF453A98B83F7A2B878D3A19D59842F0D80B585EFD78CF9FC21A2AC5774";
+
+    [TestMethod]
+    [DataRow(OrnekParmakIzi)]
+    [DataRow("d98c1ef453a98b83f7a2b878d3a19d59842f0d80b585efd78cf9fc21a2ac5774")]
+    [DataRow("  D98C 1EF4 53A9 8B83 F7A2 B878 D3A1 9D59 842F 0D80 B585 EFD7 8CF9 FC21 A2AC 5774 ")]
+    [DataRow("D9:8C:1E:F4:53:A9:8B:83:F7:A2:B8:78:D3:A1:9D:59:84:2F:0D:80:B5:85:EF:D7:8C:F9:FC:21:A2:AC:57:74")]
+    public void ParmakIzi_BoslukIkiNoktaVeKucukHarfYokSayilir(string metin)
+    {
+        Assert.AreEqual(OrnekParmakIzi, ParmakIziBicimi.Duzenle(metin));
+    }
+
+    [TestMethod]
+    [DataRow("")]
+    [DataRow("192.168.1.20:5050")]
+    [DataRow("D98C1EF453A98B83")]                                                           // kisa
+    [DataRow("D98C1EF453A98B83F7A2B878D3A19D59842F0D80B585EFD78CF9FC21A2AC577G")]           // G onaltilik degil
+    [DataRow("D98C1EF453A98B83F7A2B878D3A19D59842F0D80B585EFD78CF9FC21A2AC57744")]          // uzun
+    public void ParmakIzi_GecersizOlanlar(string metin)
+    {
+        Assert.IsNull(ParmakIziBicimi.Duzenle(metin));
+    }
+
+    [TestMethod]
+    public void ParmakIziDeposu_Sil_SadeceOAdresiSiler()
+    {
+        string klasor = Path.Combine(Path.GetTempPath(), "chatapp-istemci-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            var depo = new ParmakIziDeposu(Path.Combine(klasor, "sunucular.json"), new SahteIstemciGunlukcu());
+            var a = new SunucuAdresi("10.0.0.1", 5050);
+            var b = new SunucuAdresi("10.0.0.2", 5050);
+            depo.Kaydet(a, "AA");
+            depo.Kaydet(b, "BB");
+
+            depo.Sil(a);
+            depo.Sil(new SunucuAdresi("10.0.0.9", 5050));   // olmayan: sorun yok
+
+            Assert.IsNull(depo.Bul(a));
+            Assert.AreEqual("BB", depo.Bul(b));
+        }
+        finally
+        {
+            if (Directory.Exists(klasor))
+            {
+                Directory.Delete(klasor, recursive: true);
+            }
+        }
+    }
+
     [TestMethod]
     public void HerHataKoduVeOturumSebebi_TurkceAciklamaAlir()
     {

@@ -10,7 +10,9 @@ using ChatApp.WinForms.Platform;
 
 namespace ChatApp.WinForms.Forms;
 
-// Giris / kayit ekrani. Sunucu agda otomatik bulunur; adres sadece "Gelismis" altinda elle yazilir (Ali karari).
+// Giris / kayit ekrani. Sunucu agda otomatik bulunur. "Gelismis" altinda (Ali karari):
+//   - Sunucu adresi: otomatik bulunamiyorsa (baska ag / ngrok) elle yazilir.
+//   - Sunucu parmak izi: ChatServer penceresindekiyle ayni olmali; yazilirsa sahte sunucuya baglanilmaz.
 // Kullanici adi (ve elle yazildiysa adres) hatirlanir, sifre hatirlanmaz.
 // Kayit: kullanici adi + gorunen ad + sifre (iki kez) + davet kodu; basariliysa ayni bilgilerle giris yapilir.
 public sealed class GirisPaneli : UserControl
@@ -22,6 +24,7 @@ public sealed class GirisPaneli : UserControl
     private readonly IGunlukcu _gunlukcu;
 
     private readonly TextBox _sunucuKutusu;
+    private readonly TextBox _parmakIziKutusu;
     private readonly TextBox _kullaniciAdiKutusu;
     private readonly TextBox _sifreKutusu;
     private readonly TextBox _sifreTekrarKutusu;
@@ -56,6 +59,7 @@ public sealed class GirisPaneli : UserControl
         _baslik = new Label { Font = new Font("Segoe UI", 16f, FontStyle.Bold), AutoSize = true, Margin = new Padding(3, 3, 3, 12) };
 
         _sunucuKutusu = Kutu();
+        _parmakIziKutusu = Kutu();
         _kullaniciAdiKutusu = Kutu();
         _sifreKutusu = Kutu(sifre: true);
         _sifreTekrarKutusu = Kutu(sifre: true);
@@ -70,7 +74,16 @@ public sealed class GirisPaneli : UserControl
         Control[] tekrar = SatirEkle(tablo, "Şifre (tekrar):", _sifreTekrarKutusu);
         Control[] davet = SatirEkle(tablo, "Davet kodu:", _davetKoduKutusu);
         _kayitSatirlari = [.. gorunen, .. tekrar, .. davet];
-        _adresSatiri = SatirEkle(tablo, "Sunucu adresi:", _sunucuKutusu);
+        _adresSatiri =
+        [
+            .. SatirEkle(tablo, "Sunucu adresi:", _sunucuKutusu),
+            .. AciklamaEkle(tablo, "IP:port, örnek 192.168.1.20:5050. Sadece sunucu otomatik bulunamıyorsa " +
+                "(başka ağ / internet, ngrok). Boş bırakılırsa otomatik bulunur."),
+            .. SatirEkle(tablo, "Sunucu parmak izi:", _parmakIziKutusu),
+            .. AciklamaEkle(tablo, "ChatServer penceresindeki \"Sertifika parmak izi\" (64 karakter). Yazılırsa " +
+                "bağlanılan sunucunun gerçekten o olduğu kontrol edilir; aynı ağdaki sahte bir sunucuya şifre gitmez. " +
+                "İsteğe bağlı."),
+        ];
 
         _tamamButonu = new Button { AutoSize = true, Margin = new Padding(3, 12, 3, 3) };
         _tamamButonu.Click += async (_, _) => await TamamAsync();
@@ -86,7 +99,7 @@ public sealed class GirisPaneli : UserControl
             Text = "Bilgilendirme: Mesajlar sunucuda saklanır. Silinen mesajlar dahil, kötüye kullanım durumunda " +
                    "sunucu yöneticisi tarafından incelenebilir. Kayıt olarak bunu kabul etmiş olursunuz."
         };
-        _gelismisBaglantisi = new LinkLabel { AutoSize = true, Margin = new Padding(3, 4, 3, 3), Text = "Gelişmiş: sunucu adresini elle yaz (internet / ngrok)" };
+        _gelismisBaglantisi = new LinkLabel { AutoSize = true, Margin = new Padding(3, 4, 3, 3) };
         _gelismisBaglantisi.LinkClicked += (_, _) => AdresSatiriniGoster(!_sunucuKutusu.Visible);
         _durumYazisi = new Label { AutoSize = true, MaximumSize = new Size(420, 0), ForeColor = Color.Firebrick, Margin = new Padding(3, 8, 3, 3) };
         var ipucu = new Label
@@ -132,7 +145,7 @@ public sealed class GirisPaneli : UserControl
         }
     }
 
-    // Elle adres kutusu bosaltilirsa otomatik bulmaya donulur.
+    // Gelismis kapatilirsa iki kutu da bosaltilir: otomatik bulma, ilk baglantida parmak izi kendiliginden ogrenilir.
     private void AdresSatiriniGoster(bool goster)
     {
         foreach (Control kontrol in _adresSatiri)
@@ -142,10 +155,11 @@ public sealed class GirisPaneli : UserControl
         if (!goster)
         {
             _sunucuKutusu.Clear();
+            _parmakIziKutusu.Clear();
         }
         _gelismisBaglantisi.Text = goster
-            ? "Otomatik bul (adres kutusunu kapat)"
-            : "Gelişmiş: sunucu adresini elle yaz (internet / ngrok)";
+            ? "Gelişmiş ayarları kapat (otomatik bul)"
+            : "Gelişmiş: sunucu adresi ve sertifika parmak izi";
     }
 
     private void ModuDegistir(bool kayit)
@@ -165,6 +179,23 @@ public sealed class GirisPaneli : UserControl
     private async Task TamamAsync()
     {
         string elleAdres = _sunucuKutusu.Text.Trim();
+        if (ParmakIziBicimi.Duzenle(elleAdres) is not null)
+        {
+            DurumGoster("\"Sunucu adresi\" kutusuna sertifika parmak izi yazılmış. Parmak izini \"Sunucu parmak izi\" " +
+                "kutusuna yazın; adres kutusunu boş bırakırsanız sunucu otomatik bulunur.");
+            return;
+        }
+        string? beklenenParmakIzi = null;
+        if (_parmakIziKutusu.TextLength > 0)
+        {
+            beklenenParmakIzi = ParmakIziBicimi.Duzenle(_parmakIziKutusu.Text);
+            if (beklenenParmakIzi is null)
+            {
+                DurumGoster($"Parmak izi {ParmakIziBicimi.Uzunluk} karakter olmalı (0-9, A-F). ChatServer penceresindeki " +
+                    "\"Kopyala\" ile alıp yapıştırın.");
+                return;
+            }
+        }
         SunucuAdresi? adres = null;
         if (elleAdres.Length > 0 && !SunucuAdresi.TryParse(elleAdres, out adres))
         {
@@ -211,7 +242,7 @@ public sealed class GirisPaneli : UserControl
             }
 
             DurumGoster("Bağlanılıyor...", Color.DimGray);
-            await BaglanAsync(adres, elleAdres, kullaniciAdi, sifre, kayit);
+            await ParmakIziyleBaglanAsync(adres, beklenenParmakIzi, elleAdres, kullaniciAdi, sifre, kayit);
         }
         finally
         {
@@ -249,7 +280,36 @@ public sealed class GirisPaneli : UserControl
         return new KayitIstegi(kullaniciAdi, gorunenAd, sifre, davetKodu);
     }
 
-    private async Task BaglanAsync(SunucuAdresi adres, string elleAdres, string kullaniciAdi, string sifre, KayitIstegi? kayit)
+    // Parmak izi elle yazildiysa bu adres icin "bilinen" o olur: TLS kontrolu sunucuyu onunla karsilastirir.
+    // Sunucuya ulasilamaz ya da uymazsa eski kayda donulur (yanlis yazilmis parmak izi kalici olmasin).
+    private async Task ParmakIziyleBaglanAsync(SunucuAdresi adres, string? beklenen, string elleAdres,
+        string kullaniciAdi, string sifre, KayitIstegi? kayit)
+    {
+        string? onceki = _parmakIzleri.Bul(adres);
+        bool degisti = beklenen is not null && !string.Equals(onceki, beklenen, StringComparison.OrdinalIgnoreCase);
+        if (degisti)
+        {
+            _parmakIzleri.Kaydet(adres, beklenen!);
+        }
+
+        bool sunucuDogrulandi = await BaglanAsync(adres, elleAdres, kullaniciAdi, sifre, kayit, beklenen);
+
+        if (degisti && !sunucuDogrulandi)
+        {
+            if (onceki is null)
+            {
+                _parmakIzleri.Sil(adres);
+            }
+            else
+            {
+                _parmakIzleri.Kaydet(adres, onceki);
+            }
+        }
+    }
+
+    // true: sunucuya TLS ile ulasildi ve parmak izi tuttu (giris/kayit reddedilmis olsa bile).
+    private async Task<bool> BaglanAsync(SunucuAdresi adres, string elleAdres, string kullaniciAdi, string sifre,
+        KayitIstegi? kayit, string? beklenenParmakIzi)
     {
         try
         {
@@ -259,7 +319,7 @@ public sealed class GirisPaneli : UserControl
                 if (!kayitSonucu.Basarili)
                 {
                     DurumGoster("Kayıt olunamadı: " + HataMetinleri.Acikla(kayitSonucu.Hata));
-                    return;
+                    return true;
                 }
                 _gunlukcu.Bilgi($"Kayit olundu, numara {kayitSonucu.KullaniciId}.");
             }
@@ -268,7 +328,7 @@ public sealed class GirisPaneli : UserControl
             if (!sonuc.Basarili)
             {
                 DurumGoster(HataMetinleri.GirisHatasi(sonuc.Hata, sonuc.Aciklama));
-                return;
+                return true;
             }
 
             _ayarDeposu.Kaydet(new IstemciAyarlari(elleAdres, kullaniciAdi));
@@ -277,11 +337,23 @@ public sealed class GirisPaneli : UserControl
             _davetKoduKutusu.Clear();
             ModuDegistir(kayit: false);
             GirisYapildi?.Invoke();
+            return true;
         }
         catch (BaglantiHatasi hata)
         {
             _gunlukcu.Uyari($"Baglanilamadi ({adres}): {hata.Message}");
             DurumGoster(hata.Message);
+            return false;
+        }
+        catch (SertifikaDegistiHatasi hata) when (beklenenParmakIzi is not null)
+        {
+            // Elle yazilan parmak izi tutmadi: soru sorulmaz, baglanilmaz.
+            _gunlukcu.Uyari($"Sunucu parmak izi elle yazilanla ayni degil: {adres}");
+            DurumGoster("Bağlanılmadı: bulunan sunucunun parmak izi yazdığınızla aynı değil.\n" +
+                $"Yazdığınız: {Grupla(hata.EskiParmakIzi)}\nSunucunun: {Grupla(hata.YeniParmakIzi)}\n" +
+                "ChatServer penceresindeki \"Sertifika parmak izi\" ile karşılaştırın. Aynıysa yanlış yazılmıştır; " +
+                "farklıysa aynı ağda başka (sahte olabilecek) bir sunucu var.");
+            return false;
         }
         catch (SertifikaDegistiHatasi hata)
         {
@@ -289,12 +361,10 @@ public sealed class GirisPaneli : UserControl
             if (YeniSertifikayaGuvenilsinMi(hata))
             {
                 _parmakIzleri.Kaydet(hata.Adres, hata.YeniParmakIzi);
-                await BaglanAsync(adres, elleAdres, kullaniciAdi, sifre, kayit);   // yeni parmak iziyle tekrar dene
+                return await BaglanAsync(adres, elleAdres, kullaniciAdi, sifre, kayit, null);   // yeni parmak iziyle tekrar dene
             }
-            else
-            {
-                DurumGoster("Bağlanılmadı: sunucunun kimliği değişmiş.");
-            }
+            DurumGoster("Bağlanılmadı: sunucunun kimliği değişmiş.");
+            return false;
         }
     }
 
@@ -333,6 +403,24 @@ public sealed class GirisPaneli : UserControl
     }
 
     private static TextBox Kutu(bool sifre = false) => new() { Width = 260, UseSystemPasswordChar = sifre };
+
+    // Kutunun altina gri, kucuk aciklama (ikinci sutunda).
+    private static Control[] AciklamaEkle(TableLayoutPanel tablo, string metin)
+    {
+        var bos = new Label { AutoSize = true, Margin = Padding.Empty };
+        var aciklama = new Label
+        {
+            Text = metin,
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = Color.DimGray,
+            Font = new Font("Segoe UI", 8.25f),
+            Margin = new Padding(3, 0, 3, 6)
+        };
+        tablo.Controls.Add(bos);
+        tablo.Controls.Add(aciklama);
+        return [bos, aciklama];
+    }
 
     private static Control[] SatirEkle(TableLayoutPanel tablo, string etiket, Control kontrol)
     {

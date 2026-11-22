@@ -49,6 +49,27 @@ public sealed class ParmakIziDeposu
         }
     }
 
+    // Elle girilen parmak izi dogrulanamadiysa (sunucuya ulasilamadi / uymadi) eski hale donmek icin.
+    public void Sil(SunucuAdresi adres)
+    {
+        lock (_kilit)
+        {
+            Dictionary<string, string> hepsi = Oku();
+            if (!hepsi.Remove(adres.Anahtar))
+            {
+                return;
+            }
+            try
+            {
+                File.WriteAllText(_dosyaYolu, JsonSerializer.Serialize(hepsi));
+            }
+            catch (Exception hata) when (hata is IOException or UnauthorizedAccessException)
+            {
+                _gunlukcu.Hata(hata, "Parmak izi dosyasi yazilamadi.");
+            }
+        }
+    }
+
     private Dictionary<string, string> Oku()
     {
         if (!File.Exists(_dosyaYolu))

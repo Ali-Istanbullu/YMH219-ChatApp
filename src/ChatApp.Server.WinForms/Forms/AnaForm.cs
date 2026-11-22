@@ -88,17 +88,18 @@ public sealed class AnaForm : Form
         // ---- Sekme: Bagli kullanicilar ----
         _bagliListesi = Liste(("ID", 80), ("Görünen ad", 220), ("IP", 140), ("Bağlandı", 160));
         var bagliSekmesi = Sekme("Bağlı kullanıcılar", _bagliListesi,
-            Buton("At", AtTiklandi), Buton("Yasakla", BagliYasaklaTiklandi));
+            Buton("At", AtTiklandi), Buton("Yasakla", BagliYasaklaTiklandi), YenileButonu());
 
         // ---- Sekme: Yasaklilar ----
         _yasakliListesi = Liste(("ID", 80), ("Kullanıcı adı", 140), ("Görünen ad", 160), ("Sebep", 260), ("Tarih", 140));
         var yasakliSekmesi = Sekme("Yasaklılar", _yasakliListesi,
-            Buton("Yasağı kaldır", YasagiKaldirTiklandi), Buton("ID / kullanıcı adıyla yasakla...", AdlaYasaklaTiklandi));
+            Buton("Yasağı kaldır", YasagiKaldirTiklandi), Buton("ID / kullanıcı adıyla yasakla...", AdlaYasaklaTiklandi),
+            YenileButonu());
 
         // ---- Sekme: Davet kodlari ----
         _davetListesi = Liste(("Kod", 120), ("Oluşturuldu", 150), ("Kullanan", 220), ("Kullanıldı", 150));
         var davetSekmesi = Sekme("Davet kodları", _davetListesi,
-            Buton("Yeni kod üret", DavetUretTiklandi), Buton("Seçili kodu kopyala", DavetKopyalaTiklandi));
+            Buton("Yeni kod üret", DavetUretTiklandi), Buton("Seçili kodu kopyala", DavetKopyalaTiklandi), YenileButonu());
 
         // ---- Sekme: Olay gunlugu ----
         _gunlukListesi = new ListBox { Dock = DockStyle.Fill, IntegralHeight = false, HorizontalScrollbar = true };
@@ -107,7 +108,9 @@ public sealed class AnaForm : Form
 
         // ---- Sekme: Mesaj kayitlari (salt okunur; silinenler dahil) ----
         var kayitSekmesi = new TabPage("Mesaj kayıtları");
-        kayitSekmesi.Controls.Add(new MesajKayitlariPaneli(yonetim, gunlukcu));
+        var kayitPaneli = new MesajKayitlariPaneli(yonetim, gunlukcu);
+        kayitPaneli.KullaniciYasaklandi += async () => await ListeleriYenileAsync();   // Yasaklılar sekmesi guncel kalsin
+        kayitSekmesi.Controls.Add(kayitPaneli);
 
         var sekmeler = new TabControl { Dock = DockStyle.Fill };
         sekmeler.TabPages.AddRange([bagliSekmesi, yasakliSekmesi, davetSekmesi, kayitSekmesi, gunlukSekmesi]);
@@ -514,6 +517,9 @@ public sealed class AnaForm : Form
         buton.Click += tiklaninca;
         return buton;
     }
+
+    // Ali istegi: her listede elle yenileme (veritabanindan yeniden okur).
+    private Button YenileButonu() => Buton("Yenile", async (_, _) => await ListeleriYenileAsync());
 
     private static Label Etiket(string metin) => new() { Text = metin, AutoSize = true, Margin = new Padding(3, 7, 3, 3) };
 }
