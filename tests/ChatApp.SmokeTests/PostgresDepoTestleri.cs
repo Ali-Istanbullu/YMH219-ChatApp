@@ -37,6 +37,9 @@ public sealed class PostgresDepoTestleri
         }
     }
 
+    private async Task<long> KaydetAsync(int gonderen, int? alici, string metin, DateTimeOffset zaman) =>
+        (await _mesajlar.KaydetAsync(gonderen, alici, metin, zaman, Guid.NewGuid())).Id;
+
     private async Task<int> HesapAcAsync(int id, string ad)
     {
         string kod = $"KOD{id % 10}-{id % 10}ABC"[..9];
@@ -111,9 +114,9 @@ public sealed class PostgresDepoTestleri
         int ali = await HesapAcAsync(111111, "ali");
         int ayse = await HesapAcAsync(222222, "ayse");
 
-        long m1 = await _mesajlar.KaydetAsync(ali, ayse, "bir", Zaman);
-        long m2 = await _mesajlar.KaydetAsync(ali, ayse, "iki ğüşıöç", Zaman.AddSeconds(1));
-        long genel = await _mesajlar.KaydetAsync(ayse, null, "genel", Zaman.AddSeconds(2));
+        long m1 = await KaydetAsync(ali, ayse, "bir", Zaman);
+        long m2 = await KaydetAsync(ali, ayse, "iki ğüşıöç", Zaman.AddSeconds(1));
+        long genel = await KaydetAsync(ayse, null, "genel", Zaman.AddSeconds(2));
         Assert.IsTrue(m1 < m2 && m2 < genel);
 
         Assert.HasCount(2, await _mesajlar.IletilmemisleriGetirAsync(ayse));
@@ -132,9 +135,80 @@ public sealed class PostgresDepoTestleri
         Assert.AreEqual(MesajDurumu.Okundu, ozel[0].MesajBilgisineCevir().Durum);
         Assert.HasCount(1, await _mesajlar.OzelGecmisAsync(ayse, ali, m2, 10));
 
-        KayitliMesaj genelMesaj = (await _mesajlar.GenelGecmisAsync(null, 10)).Single();
+        KayitliMesaj genelMesaj = (await _mesajlar.GenelGecmisAsync(ali, null, 10)).Single();
         Assert.IsNull(genelMesaj.AliciId);
         Assert.AreEqual("AYSE", genelMesaj.GonderenAd);
+    }
+
+    [TestMethod]
+    public async Task AyniIstemciMesaji_IkinciKezKaydedilmez()
+    {
+        int ali = await HesapAcAsync(111111, "ali");
+        var istemciId = Guid.NewGuid();
+
+        (long ilk, bool yeni1) = await _mesajlar.KaydetAsync(ali, null, "tek", Zaman, istemciId);
+        (long ikinci, bool yeni2) = await _mesajlar.KaydetAsync(ali, null, "tek", Zaman, istemciId);
+
+        Assert.IsTrue(yeni1);
+        Assert.IsFalse(yeni2);
+        Assert.AreEqual(ilk, ikinci);
+        Assert.AreEqual(1, await _mesajlar.MesajSayisiAsync());
+    }
+
+    [TestMethod]
+    public async Task Silme_IsaretlerKaydiSilmez_YoneticiHepsiniGorur()
+    {
+        int ali = await HesapAcAsync(111111, "ali");
+        int ayse = await HesapAcAsync(222222, "ayse");
+        long m1 = await KaydetAsync(ali, ayse, "bir", Zaman);
+        long m2 = await KaydetAsync(ayse, ali, "iki", Zaman.AddSeconds(1));
+        long m3 = await KaydetAsync(ali, ayse, "uc", Zaman.AddSeconds(2));
+        long genel = await KaydetAsync(ayse, null, "genel", Zaman.AddSeconds(3));
+
+        await _mesajlar.GizleAsync(ali, m1, Zaman);          // Ali "benden sil"
+        await _mesajlar.HerkestenSilAsync(m3, Zaman);        // Ali "herkesten sil"
+        await _mesajlar.GizleAsync(ali, genel, Zaman);       // Ali Genel'deki mesaji kendinden sildi
+        await _mesajlar.SohbetiSilAsync(ayse, ali, Zaman);   // Ayse sohbeti sildi
+
+        CollectionAssert.AreEqual(new long[] { m3, m2 }, (await _mesajlar.OzelGecmisAsync(ali, ayse, null, 10)).Select(m => m.Id).ToArray());
+        KayitliMesaj silinen = (await _mesajlar.OzelGecmisAsync(ali, ayse, null, 10))[0];
+        Assert.IsTrue(silinen.HerkestenSilindi);
+        Assert.AreEqual(string.Empty, silinen.MesajBilgisineCevir().Metin, "istemciye metin gitmez");
+        Assert.IsEmpty(await _mesajlar.OzelGecmisAsync(ayse, ali, null, 10), "Ayse sohbeti sildi");
+        Assert.IsEmpty(await _mesajlar.SohbetleriGetirAsync(ayse));
+        Assert.IsEmpty(await _mesajlar.GenelGecmisAsync(ali, null, 10));
+        Assert.HasCount(1, await _mesajlar.GenelGecmisAsync(ayse, null, 10));
+
+        long m4 = await KaydetAsync(ali, ayse, "dort", Zaman.AddSeconds(4));   // yeni mesaj: sohbet Ayse'de geri gelir
+        Assert.AreEqual(m4, (await _mesajlar.OzelGecmisAsync(ayse, ali, null, 10)).Single().Id);
+        Assert.AreEqual(1, (await _mesajlar.SohbetleriGetirAsync(ayse)).Single().Okunmamis);
+
+        // Yonetici: hepsi, metinleriyle ve kimin gizledigiyle.
+        IReadOnlyList<YonetimMesajKaydi> kayitlar = await _mesajlar.YonetimOzelKayitlarAsync(ali, ayse, null, 10);
+        Assert.HasCount(4, kayitlar);
+        YonetimMesajKaydi k1 = kayitlar.Single(k => k.Mesaj.Id == m1);
+        CollectionAssert.AreEquivalent(new[] { ali, ayse }, k1.Gizleyenler.ToArray());
+        YonetimMesajKaydi k3 = kayitlar.Single(k => k.Mesaj.Id == m3);
+        Assert.AreEqual("uc", k3.Mesaj.Metin);
+        Assert.IsTrue(k3.Mesaj.HerkestenSilindi);
+        Assert.IsEmpty(kayitlar.Single(k => k.Mesaj.Id == m4).Gizleyenler);
+        CollectionAssert.AreEqual(new[] { ali }, (await _mesajlar.YonetimGenelKayitlarAsync(null, 10)).Single().Gizleyenler.ToArray());
+        Assert.AreEqual(4, (await _mesajlar.YonetimSohbetleriAsync(ayse)).Single().MesajSayisi);
+
+        // Temizlik gizlenmis mesaji da siler (gizleme kaydiyla birlikte).
+        Assert.AreEqual(4, await _mesajlar.EnEskileriSilAsync(1));
+        Assert.AreEqual(1, await _mesajlar.MesajSayisiAsync());
+    }
+
+    [TestMethod]
+    public async Task Hazirla_IkinciKezCalisinca_BozulmazVeriKalir()
+    {
+        int ali = await HesapAcAsync(111111, "ali");
+        await KaydetAsync(ali, null, "kalici", Zaman);
+
+        await _db.Veritabani.HazirlaAsync();   // eski veritabaninda yeni surum acildiginda olan bu
+
+        Assert.HasCount(1, await _mesajlar.GenelGecmisAsync(ali, null, 10));
     }
 
     [TestMethod]
@@ -168,7 +242,7 @@ public sealed class PostgresDepoTestleri
         int ali = await HesapAcAsync(111111, "ali");
         for (int i = 1; i <= 50; i++)
         {
-            await _mesajlar.KaydetAsync(ali, null, $"mesaj {i}", Zaman.AddSeconds(i));
+            await KaydetAsync(ali, null, $"mesaj {i}", Zaman.AddSeconds(i));
         }
         Assert.AreEqual(50, await _mesajlar.MesajSayisiAsync());
         Assert.IsGreaterThan(0L, await _mesajlar.TabloBoyutuAsync());
@@ -176,7 +250,7 @@ public sealed class PostgresDepoTestleri
         Assert.AreEqual(30, await _mesajlar.EnEskileriSilAsync(20));
         await _mesajlar.SikistirAsync();
 
-        IReadOnlyList<KayitliMesaj> kalan = await _mesajlar.GenelGecmisAsync(null, 100);
+        IReadOnlyList<KayitliMesaj> kalan = await _mesajlar.GenelGecmisAsync(ali, null, 100);
         Assert.HasCount(20, kalan);
         Assert.AreEqual("mesaj 50", kalan[0].Metin);
         Assert.AreEqual("mesaj 31", kalan[^1].Metin);

@@ -42,6 +42,31 @@ public sealed class PostgresVeritabani : IAsyncDisposable
             WHERE iletildi_zamani IS NULL AND alici_id IS NOT NULL;
         CREATE INDEX IF NOT EXISTS ix_mesajlar_genel ON mesajlar (id) WHERE alici_id IS NULL;
 
+        -- Silme ozellikleri (22.11). Eski veritabaninda da calissin diye ALTER ... IF NOT EXISTS.
+        ALTER TABLE mesajlar ADD COLUMN IF NOT EXISTS istemci_mesaj_id uuid;
+        ALTER TABLE mesajlar ADD COLUMN IF NOT EXISTS herkesten_silindi_zamani timestamptz;
+        -- Ayni mesaj (baglanti kopunca tekrar gonderilen) ikinci kez kaydedilmez.
+        CREATE UNIQUE INDEX IF NOT EXISTS ux_mesajlar_istemci ON mesajlar (gonderen_id, istemci_mesaj_id)
+            WHERE istemci_mesaj_id IS NOT NULL;
+
+        -- "Benden sil": hangi kullanici hangi mesaji kendinden gizledi. Mesaj temizlikte silinirse bu da silinir.
+        CREATE TABLE IF NOT EXISTS mesaj_gizlemeleri (
+            kullanici_id integer     NOT NULL REFERENCES kullanicilar(id),
+            mesaj_id     bigint      NOT NULL REFERENCES mesajlar(id) ON DELETE CASCADE,
+            zaman        timestamptz NOT NULL,
+            PRIMARY KEY (kullanici_id, mesaj_id)
+        );
+        CREATE INDEX IF NOT EXISTS ix_gizlemeler_mesaj ON mesaj_gizlemeleri (mesaj_id);
+
+        -- "Sohbeti sil": kullanici, karsi kisiyle olan sohbetin son_mesaj_id'ye kadarki kismini gizledi.
+        CREATE TABLE IF NOT EXISTS sohbet_silmeleri (
+            kullanici_id integer     NOT NULL REFERENCES kullanicilar(id),
+            karsi_id     integer     NOT NULL REFERENCES kullanicilar(id),
+            son_mesaj_id bigint      NOT NULL,
+            zaman        timestamptz NOT NULL,
+            PRIMARY KEY (kullanici_id, karsi_id)
+        );
+
         CREATE TABLE IF NOT EXISTS engellemeler (
             engelleyen_id integer     NOT NULL REFERENCES kullanicilar(id),
             engellenen_id integer     NOT NULL REFERENCES kullanicilar(id),

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ChatApp.exe: kullanicilarin kurdugu sohbet penceresi. Butun mantik ChatApp.Client kutuphanesinde;
+       burada sadece pencereler, log dosyasi, bildirim ve siniflarin birbirine baglanmasi (DI) var. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>ChatApp</AssemblyName>
+    <Version>1.0.0</Version>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChatApp.Protocol\ChatApp.Protocol.csproj" />
+    <ProjectReference Include="..\ChatApp.Client\ChatApp.Client.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
+    <PackageReference Include="Serilog" Version="4.4.0" />
+    <PackageReference Include="Serilog.Sinks.File" Version="7.0.0" />
+  </ItemGroup>
+
+</Project>

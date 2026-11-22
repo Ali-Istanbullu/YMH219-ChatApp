@@ -5,5 +5,7 @@ public enum IslemTuru
 {
     Engelle,
     EngelKaldir,
-    SifreDegistir
+    SifreDegistir,
+    MesajSil,
+    SohbetSil
 }

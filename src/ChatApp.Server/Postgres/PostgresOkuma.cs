@@ -12,7 +12,7 @@ internal static class PostgresOkuma
 
     public const string MesajSorgusu = """
         SELECT m.id, m.gonderen_id, k.gorunen_ad, m.alici_id, m.metin,
-               m.gonderim_zamani, m.iletildi_zamani, m.okundu_zamani
+               m.gonderim_zamani, m.iletildi_zamani, m.okundu_zamani, m.herkesten_silindi_zamani
         FROM mesajlar m JOIN kullanicilar k ON k.id = m.gonderen_id
         """;
 
@@ -36,7 +36,8 @@ internal static class PostgresOkuma
         s.GetString(4),
         s.GetFieldValue<DateTimeOffset>(5),
         BosOlabilirZaman(s, 6),
-        BosOlabilirZaman(s, 7));
+        BosOlabilirZaman(s, 7),
+        BosOlabilirZaman(s, 8));
 
     public static DateTimeOffset? BosOlabilirZaman(NpgsqlDataReader s, int sira) =>
         s.IsDBNull(sira) ? null : s.GetFieldValue<DateTimeOffset>(sira);

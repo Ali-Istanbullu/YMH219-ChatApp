@@ -115,9 +115,11 @@ public sealed class PaketIsleyici
             await eskiOturum.KapatAsync(new OturumSonlandi(OturumSonuSebebi.BaskaYerdenGiris, null));
         }
 
+        // Sira: sonuc -> bekleyen mesajlar -> sohbet listesi. Liste en son gelir ki okunmamis sayilari
+        // (bekleyenler dahil) son soz olsun; istemci bekleyenleri ikinci kez saymasin.
         await oturum.GonderAsync(sonuc);
-        await oturum.GonderAsync(await _kisiler.SohbetListesiAsync(kullanici.Id));
         await _mesajlar.BekleyenleriIletAsync(oturum);
+        await oturum.GonderAsync(await _kisiler.SohbetListesiAsync(kullanici.Id));
         if (eskiOturum is null)
         {
             await _kisiler.CevrimiciDurumunuBildirAsync(kullanici.Id, true);
@@ -143,6 +145,12 @@ public sealed class PaketIsleyici
                 return true;
             case EngelleIstegi engel:
                 await oturum.GonderAsync(await _kisiler.EngelleAsync(kullaniciId, engel));
+                return true;
+            case MesajSilIstegi sil:
+                await _mesajlar.SilAsync(oturum, sil);
+                return true;
+            case SohbetSilIstegi sohbetSil:
+                await oturum.GonderAsync(await _mesajlar.SohbetSilAsync(kullaniciId, sohbetSil));
                 return true;
             case SifreDegistirIstegi sifre:
                 await oturum.GonderAsync(await _hesaplar.SifreDegistirAsync(kullaniciId, sifre));

@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using ChatApp.Server.Abstractions;
 using ChatApp.Server.Data;
@@ -14,6 +15,7 @@ public sealed class SunucuCalistirici : IAsyncDisposable
     private static readonly TimeSpan TemizlikAraligi = TimeSpan.FromDays(1);
 
     private readonly TcpSunucu _tcp;
+    private readonly KesifYanitlayici _kesif;
     private readonly SertifikaDeposu _sertifikalar;
     private readonly MesajTemizleyici _temizleyici;
     private readonly IGunlukcu _gunlukcu;
@@ -22,19 +24,25 @@ public sealed class SunucuCalistirici : IAsyncDisposable
     private CancellationTokenSource? _temizlikIptali;
     private Task? _temizlikGorevi;
 
-    public SunucuCalistirici(TcpSunucu tcp, SertifikaDeposu sertifikalar, MesajTemizleyici temizleyici, IGunlukcu gunlukcu)
+    public SunucuCalistirici(TcpSunucu tcp, KesifYanitlayici kesif, SertifikaDeposu sertifikalar,
+        MesajTemizleyici temizleyici, IGunlukcu gunlukcu)
     {
         ArgumentNullException.ThrowIfNull(tcp);
+        ArgumentNullException.ThrowIfNull(kesif);
         ArgumentNullException.ThrowIfNull(sertifikalar);
         ArgumentNullException.ThrowIfNull(temizleyici);
         ArgumentNullException.ThrowIfNull(gunlukcu);
         _tcp = tcp;
+        _kesif = kesif;
         _sertifikalar = sertifikalar;
         _temizleyici = temizleyici;
         _gunlukcu = gunlukcu;
     }
 
     public bool CalisiyorMu => _tcp.CalisiyorMu;
+
+    // ChatApp'ler sunucuyu agda kendiliginden bulabiliyor mu? (UDP 5051 aciksa evet)
+    public bool OtomatikBulmaAcikMi => _kesif.CalisiyorMu;
 
     // Istemcilerin ilk baglantida gordugu parmak izi (sunucu baslayinca dolar).
     public string? ParmakIzi => _sertifika is null ? null : SertifikaDeposu.ParmakIzi(_sertifika);
@@ -45,6 +53,16 @@ public sealed class SunucuCalistirici : IAsyncDisposable
     {
         _sertifika ??= _sertifikalar.YukleVeyaOlustur();
         _tcp.Baslat(port, _sertifika);
+
+        try
+        {
+            _kesif.Baslat(port);
+        }
+        catch (SocketException hata)
+        {
+            // Sohbet yine calisir; sadece ChatApp'ler sunucuyu kendiliginden bulamaz (elle adres yazilir).
+            _gunlukcu.Hata(hata, "Otomatik bulma acilamadi (UDP 5051 kullanimda olabilir).");
+        }
 
         _temizlikIptali = new CancellationTokenSource();
         _temizlikGorevi = TemizlikDongusuAsync(_temizlikIptali.Token);
@@ -59,6 +77,7 @@ public sealed class SunucuCalistirici : IAsyncDisposable
             _temizlikIptali.Dispose();
             _temizlikIptali = null;
         }
+        await _kesif.DurdurAsync();
         await _tcp.DurdurAsync();
     }
 

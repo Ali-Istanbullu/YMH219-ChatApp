@@ -3,6 +3,8 @@
     <Project Path="src/ChatApp.Protocol/ChatApp.Protocol.csproj" />
     <Project Path="src/ChatApp.Server/ChatApp.Server.csproj" />
     <Project Path="src/ChatApp.Server.WinForms/ChatApp.Server.WinForms.csproj" />
+    <Project Path="src/ChatApp.Client/ChatApp.Client.csproj" />
+    <Project Path="src/ChatApp.WinForms/ChatApp.WinForms.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ChatApp.SmokeTests/ChatApp.SmokeTests.csproj" />

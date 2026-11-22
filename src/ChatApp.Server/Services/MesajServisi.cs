@@ -8,11 +8,12 @@ using ChatApp.Server.Sessions;
 
 namespace ChatApp.Server.Services;
 
-// Mesajlasma: gonderme, iletme, okundu bilgisi, gecmis, cevrimdisiyken biriken mesajlar.
+// Mesajlasma: gonderme, iletme, okundu bilgisi, gecmis, cevrimdisiyken biriken mesajlar, silme.
 // Engelleme kurallari burada (sunucuda) uygulanir; istemci degistirilse bile asilamaz.
 public sealed class MesajServisi
 {
     public const int SaniyedeEnFazlaMesaj = 5;
+    public const int SaniyedeEnFazlaSilme = 10;
 
     private readonly OturumYoneticisi _oturumlar;
     private readonly IKullaniciDeposu _kullanicilar;
@@ -50,7 +51,18 @@ public sealed class MesajServisi
         }
 
         DateTimeOffset zaman = _saat.SimdiUtc;
-        long mesajId = await _mesajlar.KaydetAsync(gonderenId, istek.AliciId, istek.Metin, zaman);
+        (long mesajId, bool yeni) = await _mesajlar.KaydetAsync(gonderenId, istek.AliciId, istek.Metin, zaman, istek.IstemciMesajId);
+        if (!yeni)
+        {
+            // Istemci baglanti kopunca ayni mesaji tekrar gonderdi: zaten kayitli. Sadece kabul bilgisi tekrar gider;
+            // aliciya ikinci kez iletilmez (iletilmediyse bekleyen mesaj olarak zaten gidecek).
+            if (await _mesajlar.MesajBulAsync(mesajId) is { } mevcut)
+            {
+                await gonderen.GonderAsync(new MesajKabulEdildi(istek.IstemciMesajId, mevcut.MesajBilgisineCevir()));
+            }
+            return;
+        }
+
         var mesaj = new MesajBilgisi(mesajId, gonderenId, gonderen.GorunenAd!, istek.AliciId, istek.Metin,
             zaman, MesajDurumu.Gonderildi);
         await gonderen.GonderAsync(new MesajKabulEdildi(istek.IstemciMesajId, mesaj));   // tek tik
@@ -108,7 +120,7 @@ public sealed class MesajServisi
         // Bir fazlasi istenir: gelirse "daha eski mesaj var" demektir.
         IReadOnlyList<KayitliMesaj> mesajlar = istek.KarsiId is int karsiId
             ? await _mesajlar.OzelGecmisAsync(kullaniciId, karsiId, istek.OncekiMesajId, adet + 1)
-            : await _mesajlar.GenelGecmisAsync(istek.OncekiMesajId, adet + 1);
+            : await _mesajlar.GenelGecmisAsync(kullaniciId, istek.OncekiMesajId, adet + 1);
 
         bool dahaVar = mesajlar.Count > adet;
         IEnumerable<KayitliMesaj> sayfa = mesajlar.Take(adet);
@@ -123,6 +135,81 @@ public sealed class MesajServisi
         // Veritabani yeniden eskiye verir; ekran eskiden yeniye gosterir.
         var sirali = sayfa.Reverse().Select(m => m.MesajBilgisineCevir()).ToList();
         return new GecmisCevabi(istek.KarsiId, sirali, dahaVar);
+    }
+
+    // "Benden sil" ya da "Herkesten sil". Mesaj veritabaninda kalir; sadece isaretlenir.
+    public async Task SilAsync(IIstemciOturumu oturum, MesajSilIstegi istek)
+    {
+        int kullaniciId = oturum.KullaniciId!.Value;
+        HataKodu? hata = await SilmeHatasiAsync(kullaniciId, istek);
+        if (hata is not null)
+        {
+            await oturum.GonderAsync(new IslemSonucu(IslemTuru.MesajSil, false, hata));
+            return;
+        }
+
+        if (!istek.Herkesten)
+        {
+            await _mesajlar.GizleAsync(kullaniciId, istek.MesajId, _saat.SimdiUtc);
+            await oturum.GonderAsync(new IslemSonucu(IslemTuru.MesajSil, true, null));
+            return;
+        }
+
+        KayitliMesaj mesaj = (await _mesajlar.MesajBulAsync(istek.MesajId))!;
+        await _mesajlar.HerkestenSilAsync(istek.MesajId, _saat.SimdiUtc);
+        await oturum.GonderAsync(new IslemSonucu(IslemTuru.MesajSil, true, null));
+
+        // Mesaji gormus olabilecek herkese: ozelde karsi taraf, Genel'de odadaki herkes.
+        var paket = new MesajHerkestenSilindi(istek.MesajId);
+        var alicilar = new List<IIstemciOturumu>();
+        if (mesaj.AliciId is int aliciId)
+        {
+            if (_oturumlar.Bul(aliciId) is { } alici)
+            {
+                alicilar.Add(alici);
+            }
+        }
+        else
+        {
+            alicilar.AddRange(_oturumlar.GirisYapanlar().Where(o => o.KullaniciId != kullaniciId));
+        }
+        foreach (IIstemciOturumu alici in alicilar)
+        {
+            await alici.GonderAsync(paket);
+        }
+    }
+
+    // Bu kisiyle olan sohbeti sadece benden gizler.
+    public async Task<IslemSonucu> SohbetSilAsync(int kullaniciId, SohbetSilIstegi istek)
+    {
+        if (istek.KarsiId == kullaniciId || await _kullanicilar.IdIleBulAsync(istek.KarsiId) is null)
+        {
+            return new IslemSonucu(IslemTuru.SohbetSil, false, HataKodu.KullaniciBulunamadi);
+        }
+        await _mesajlar.SohbetiSilAsync(kullaniciId, istek.KarsiId, _saat.SimdiUtc);
+        return new IslemSonucu(IslemTuru.SohbetSil, true, null);
+    }
+
+    private async Task<HataKodu?> SilmeHatasiAsync(int kullaniciId, MesajSilIstegi istek)
+    {
+        if (!_hizSinirlayici.IzinVer($"sil:{kullaniciId}", SaniyedeEnFazlaSilme, TimeSpan.FromSeconds(1)))
+        {
+            return HataKodu.HizSiniriAsildi;
+        }
+
+        // Sadece gorebilecegi mesaji silebilir: Genel oda mesaji ya da tarafi oldugu ozel mesaj.
+        KayitliMesaj? mesaj = await _mesajlar.MesajBulAsync(istek.MesajId);
+        bool gorebilir = mesaj is not null
+            && (mesaj.AliciId is null || mesaj.GonderenId == kullaniciId || mesaj.AliciId == kullaniciId);
+        if (!gorebilir)
+        {
+            return HataKodu.MesajBulunamadi;
+        }
+        if (istek.Herkesten && mesaj!.GonderenId != kullaniciId)
+        {
+            return HataKodu.SadeceKendiMesajin;
+        }
+        return null;
     }
 
     private async Task<HataKodu?> ReddetmeSebebiAsync(int gonderenId, MesajGonder istek)

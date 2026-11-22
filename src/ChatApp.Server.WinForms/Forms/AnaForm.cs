@@ -13,7 +13,7 @@ namespace ChatApp.Server.WinForms.Forms;
 //  SUNUCU PENCERESI
 //
 //  Ust satir: port, Başlat/Durdur, veritabani ayarlari, sertifika parmak izi.
-//  Sekmeler: Bağlı kullanıcılar (At/Yasakla), Yasaklılar, Davet kodları, Olay günlüğü.
+//  Sekmeler: Bağlı kullanıcılar (At/Yasakla), Yasaklılar, Davet kodları, Mesaj kayıtları, Olay günlüğü.
 //  Alt satir: hesap sayisi, mesaj sayisi, mesaj tablosunun boyutu.
 //
 //  Is mantigi yok: her sey YonetimServisi / SunucuCalistirici'ya iletilir.
@@ -105,8 +105,12 @@ public sealed class AnaForm : Form
         var gunlukSekmesi = new TabPage("Olay günlüğü");
         gunlukSekmesi.Controls.Add(_gunlukListesi);
 
+        // ---- Sekme: Mesaj kayitlari (salt okunur; silinenler dahil) ----
+        var kayitSekmesi = new TabPage("Mesaj kayıtları");
+        kayitSekmesi.Controls.Add(new MesajKayitlariPaneli(yonetim, gunlukcu));
+
         var sekmeler = new TabControl { Dock = DockStyle.Fill };
-        sekmeler.TabPages.AddRange([bagliSekmesi, yasakliSekmesi, davetSekmesi, gunlukSekmesi]);
+        sekmeler.TabPages.AddRange([bagliSekmesi, yasakliSekmesi, davetSekmesi, kayitSekmesi, gunlukSekmesi]);
 
         // ---- Alt satir ----
         _istatistikYazisi = new ToolStripStatusLabel();
@@ -230,7 +234,9 @@ public sealed class AnaForm : Form
         _baslatButonu.Enabled = !calisiyor;
         _durdurButonu.Enabled = calisiyor;
         _portKutusu.Enabled = !calisiyor;
-        _durumYazisi.Text = calisiyor ? "● ÇALIŞIYOR" : "● KAPALI";
+        _durumYazisi.Text = !calisiyor ? "● KAPALI"
+            : _calistirici.OtomatikBulmaAcikMi ? "● ÇALIŞIYOR"
+            : "● ÇALIŞIYOR (otomatik bulma kapalı, log'a bakın)";
         _durumYazisi.ForeColor = calisiyor ? Color.ForestGreen : Color.Firebrick;
         _parmakIziKutusu.Text = _calistirici.ParmakIzi ?? "(sunucu başlayınca görünür)";
     }

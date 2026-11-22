@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ChatApp istemcisinin butun mantigi: TLS baglanti, giris, otomatik yeniden baglanma,
+       sohbet durumu (mesajlar, tikler, okunmamis), sertifika parmak izi.
+       Pencere (WinForms) icermez: birim testleri dogrudan bu projeyi test eder. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ChatApp.Protocol\ChatApp.Protocol.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ChatApp.UnitTests" />
+  </ItemGroup>
+
+</Project>

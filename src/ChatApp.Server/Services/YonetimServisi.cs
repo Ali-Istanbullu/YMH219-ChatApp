@@ -110,6 +110,19 @@ public sealed class YonetimServisi
 
     public Task<IReadOnlyList<KullaniciKaydi>> YasaklilarAsync() => _kullanicilar.YasaklilariGetirAsync();
 
+    // ---- Mesaj kayitlari (silinen ve gizlenen mesajlar dahil; salt okunur) ----
+    public const int KayitSayfaBoyutu = 200;
+
+    public Task<IReadOnlyList<YonetimSohbetOzeti>> KullaniciSohbetleriAsync(int kullaniciId) =>
+        _mesajlar.YonetimSohbetleriAsync(kullaniciId);
+
+    // Eskiden yeniye. oncekiMesajId verilirse ondan eski sayfa.
+    public async Task<IReadOnlyList<YonetimMesajKaydi>> OzelKayitlarAsync(int kullaniciId, int karsiId, long? oncekiMesajId) =>
+        [.. (await _mesajlar.YonetimOzelKayitlarAsync(kullaniciId, karsiId, oncekiMesajId, KayitSayfaBoyutu)).Reverse()];
+
+    public async Task<IReadOnlyList<YonetimMesajKaydi>> GenelKayitlarAsync(long? oncekiMesajId) =>
+        [.. (await _mesajlar.YonetimGenelKayitlarAsync(oncekiMesajId, KayitSayfaBoyutu)).Reverse()];
+
     public async Task<SunucuIstatistigi> IstatistikAsync() => new(
         await _kullanicilar.HesapSayisiAsync(),
         await _mesajlar.MesajSayisiAsync(),

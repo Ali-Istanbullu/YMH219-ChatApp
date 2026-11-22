@@ -2,7 +2,8 @@ using ChatApp.Protocol.Modeller;
 
 namespace ChatApp.Server.Data;
 
-// mesajlar tablosundaki bir satir (gonderenin gorunen adiyla birlikte).
+// Veritabanindaki bir mesaj. Herkesten silinmis olsa bile metin burada durur (yonetici kaniti icin);
+// istemcilere giderken metin bosaltilir.
 public sealed record KayitliMesaj(
     long Id,
     int GonderenId,
@@ -11,13 +12,16 @@ public sealed record KayitliMesaj(
     string Metin,
     DateTimeOffset GonderimZamani,
     DateTimeOffset? IletildiZamani,
-    DateTimeOffset? OkunduZamani)
+    DateTimeOffset? OkunduZamani,
+    DateTimeOffset? HerkestenSilindiZamani = null)
 {
-    public MesajBilgisi MesajBilgisineCevir()
-    {
-        MesajDurumu durum = OkunduZamani is not null ? MesajDurumu.Okundu
-            : IletildiZamani is not null ? MesajDurumu.Iletildi
-            : MesajDurumu.Gonderildi;
-        return new MesajBilgisi(Id, GonderenId, GonderenAd, AliciId, Metin, GonderimZamani, durum);
-    }
+    public MesajDurumu Durum => OkunduZamani is not null ? MesajDurumu.Okundu
+        : IletildiZamani is not null ? MesajDurumu.Iletildi
+        : MesajDurumu.Gonderildi;
+
+    public bool HerkestenSilindi => HerkestenSilindiZamani is not null;
+
+    // Istemciye gidecek bicim: herkesten silinmis mesajin metni gonderilmez.
+    public MesajBilgisi MesajBilgisineCevir() =>
+        new(Id, GonderenId, GonderenAd, AliciId, HerkestenSilindi ? string.Empty : Metin, GonderimZamani, Durum, HerkestenSilindi);
 }

@@ -32,7 +32,7 @@ public sealed class PaketIsleyiciTestleri
     }
 
     [TestMethod]
-    public async Task Giris_SirasiylaSonucListeVeBekleyenMesajlarGelir()
+    public async Task Giris_SirasiylaSonucBekleyenMesajlarVeListeGelir()
     {
         int aliId = await _o.HesapAcAsync("ali", "Ali");
         int ayseId = await _o.HesapAcAsync("ayse", "Ayse");
@@ -41,7 +41,7 @@ public sealed class PaketIsleyiciTestleri
         SahteOturum ali = await _o.GirisYapAsync("ali");
 
         var turler = ali.Gelenler.Select(p => p.GetType()).ToList();
-        CollectionAssert.AreEqual(new[] { typeof(GirisSonucu), typeof(SohbetListesi), typeof(MesajGeldi) }, turler);
+        CollectionAssert.AreEqual(new[] { typeof(GirisSonucu), typeof(MesajGeldi), typeof(SohbetListesi) }, turler);
         Assert.IsTrue(_o.Oturumlar.CevrimiciMi(aliId));
     }
 

@@ -131,6 +131,7 @@ internal static class Program
         servisler.AddSingleton<MesajTemizleyici>();
         servisler.AddSingleton<PaketIsleyici>();
         servisler.AddSingleton<TcpSunucu>();
+        servisler.AddSingleton<KesifYanitlayici>();
         servisler.AddSingleton<SunucuCalistirici>();
 
         // ---- Pencere ----

@@ -16,6 +16,8 @@ namespace ChatApp.Protocol.Paketler;
 [JsonDerivedType(typeof(KullaniciSorgula), "KullaniciSorgula")]
 [JsonDerivedType(typeof(EngelleIstegi), "EngelleIstegi")]
 [JsonDerivedType(typeof(SifreDegistirIstegi), "SifreDegistirIstegi")]
+[JsonDerivedType(typeof(MesajSilIstegi), "MesajSilIstegi")]
+[JsonDerivedType(typeof(SohbetSilIstegi), "SohbetSilIstegi")]
 [JsonDerivedType(typeof(KayitSonucu), "KayitSonucu")]
 [JsonDerivedType(typeof(GirisSonucu), "GirisSonucu")]
 [JsonDerivedType(typeof(SohbetListesi), "SohbetListesi")]
@@ -30,4 +32,5 @@ namespace ChatApp.Protocol.Paketler;
 [JsonDerivedType(typeof(IslemSonucu), "IslemSonucu")]
 [JsonDerivedType(typeof(HataBildirimi), "HataBildirimi")]
 [JsonDerivedType(typeof(OturumSonlandi), "OturumSonlandi")]
+[JsonDerivedType(typeof(MesajHerkestenSilindi), "MesajHerkestenSilindi")]
 public abstract record Paket;

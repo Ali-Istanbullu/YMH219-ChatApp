@@ -19,5 +19,7 @@ public enum HataKodu
     MesajGecersiz,
     HizSiniriAsildi,
     EskiSifreYanlis,
-    SunucuHatasi
+    SunucuHatasi,
+    MesajBulunamadi,
+    SadeceKendiMesajin
 }
