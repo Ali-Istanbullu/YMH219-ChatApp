@@ -7,6 +7,7 @@
     <Project Path="src/ChatApp.WinForms/ChatApp.WinForms.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/ChatApp.PerformanceTests/ChatApp.PerformanceTests.csproj" />
     <Project Path="tests/ChatApp.SmokeTests/ChatApp.SmokeTests.csproj" />
     <Project Path="tests/ChatApp.UnitTests/ChatApp.UnitTests.csproj" />
   </Folder>

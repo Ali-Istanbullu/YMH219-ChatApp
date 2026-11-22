@@ -8,10 +8,15 @@ namespace ChatApp.Server.WinForms.Platform;
 // Program klasorune yazilmaz. Klasor silinirse her istekte yeniden olusturulur.
 public static class UygulamaYollari
 {
+    // Testler exe'yi gecici bir klasorle calistirir (CHATSERVER_VERI_KLASORU); boylece gercek ayarlara ve verilere dokunulmaz.
+    public const string TestKlasoruDegiskeni = "CHATSERVER_VERI_KLASORU";
+
     public static string KokKlasor()
     {
-        string klasor = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChatServer");
+        string? test = Environment.GetEnvironmentVariable(TestKlasoruDegiskeni);
+        string klasor = !string.IsNullOrWhiteSpace(test)
+            ? test
+            : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ChatServer");
         Directory.CreateDirectory(klasor);   // olusturulamazsa IOException; cagiran yakalar
         return klasor;
     }

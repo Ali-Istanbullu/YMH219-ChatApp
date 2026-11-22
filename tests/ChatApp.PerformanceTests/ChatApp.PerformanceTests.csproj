@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Performans testleri: gercek TLS ile cok kisili mesajlasma, sifre hashleme suresi, PostgreSQL'de mesaj basina
+       yer ve sorgu hizi. Esikler olculen degerlerin birkac kati konuldu; olculen sayilar test ciktisina yazilir.
+       CI'da build'i kirmaz (bulut sunucusu yavas olabilir). PostgreSQL testi CHATAPP_TEST_DB yoksa atlanir. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MSTest" Version="4.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ChatApp.Protocol\ChatApp.Protocol.csproj" />
+    <ProjectReference Include="..\..\src\ChatApp.Server\ChatApp.Server.csproj" />
+    <ProjectReference Include="..\..\src\ChatApp.Client\ChatApp.Client.csproj" />
+  </ItemGroup>
+
+  <!-- Birim testlerindeki sahte depolar ve gecici PostgreSQL semasi yardimcisi aynen kullanilir (kopya yok). -->
+  <ItemGroup>
+    <Compile Include="..\ChatApp.UnitTests\Fakes\*.cs" Link="Ortak\%(Filename)%(Extension)" />
+    <Compile Include="..\ChatApp.SmokeTests\TestVeritabani.cs" Link="Ortak\TestVeritabani.cs" />
+  </ItemGroup>
+
+</Project>
