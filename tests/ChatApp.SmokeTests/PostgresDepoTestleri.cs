@@ -1,6 +1,7 @@
 using ChatApp.Protocol.Modeller;
 using ChatApp.Server.Data;
 using ChatApp.Server.Postgres;
+using Npgsql;
 
 namespace ChatApp.SmokeTests;
 
@@ -186,7 +187,37 @@ public sealed class PostgresDepoTestleri
     public async Task UlasilamayanVeritabani_DepoHatasiVerir()
     {
         // Bos bir porta baglanmaya calis: beklenen hata DepoHatasi'na sarilmali.
-        await using var kapali = new PostgresVeritabani("Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=2");
-        await Assert.ThrowsExactlyAsync<DepoHatasi>(() => kapali.HazirlaAsync());
+        // Windows "baglanti reddedildi" cevabini ~2 sn denedikten sonra verir; zaman asimi bundan uzun olmali.
+        await using var kapali = new PostgresVeritabani("Host=127.0.0.1;Port=1;Database=x;Username=x;Password=x;Timeout=10");
+        DepoHatasi hata = await Assert.ThrowsExactlyAsync<DepoHatasi>(() => kapali.HazirlaAsync());
+        Assert.AreEqual(DepoHatasiSebebi.BaglantiKurulamadi, hata.Sebep);
+    }
+
+    [TestMethod]
+    public async Task YanlisSifre_KimlikDogrulanamadi()
+    {
+        var yanlis = new NpgsqlConnectionStringBuilder(GercekBaglanti()) { Password = "kesinlikle-yanlis-sifre" };
+        await using var veritabani = new PostgresVeritabani(yanlis.ConnectionString);
+        DepoHatasi hata = await Assert.ThrowsExactlyAsync<DepoHatasi>(() => veritabani.HazirlaAsync());
+        Assert.AreEqual(DepoHatasiSebebi.KimlikDogrulanamadi, hata.Sebep);
+    }
+
+    [TestMethod]
+    public async Task OlmayanVeritabani_VeritabaniYok()
+    {
+        var yanlis = new NpgsqlConnectionStringBuilder(GercekBaglanti()) { Database = "olmayan_vt_" + Guid.NewGuid().ToString("N") };
+        await using var veritabani = new PostgresVeritabani(yanlis.ConnectionString);
+        DepoHatasi hata = await Assert.ThrowsExactlyAsync<DepoHatasi>(() => veritabani.HazirlaAsync());
+        Assert.AreEqual(DepoHatasiSebebi.VeritabaniYok, hata.Sebep);
+    }
+
+    private static string GercekBaglanti()
+    {
+        string baglanti = Environment.GetEnvironmentVariable(TestVeritabani.OrtamDegiskeni) ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(baglanti))
+        {
+            Assert.Inconclusive($"{TestVeritabani.OrtamDegiskeni} tanimli degil; PostgreSQL testleri atlandi.");
+        }
+        return baglanti;
     }
 }

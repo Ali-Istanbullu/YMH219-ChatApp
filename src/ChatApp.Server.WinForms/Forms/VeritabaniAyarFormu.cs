@@ -55,7 +55,7 @@ public sealed class VeritabaniAyarFormu : Form
         SatirEkle(tablo, "Kullanıcı:", _kullaniciKutusu);
         SatirEkle(tablo, "Şifre:", _sifreKutusu);
 
-        _durumYazisi = new Label { AutoSize = true, MaximumSize = new Size(400, 0), ForeColor = Color.Firebrick, Padding = new Padding(12, 0, 12, 0) };
+        _durumYazisi = new Label { AutoSize = true, MaximumSize = new Size(420, 0), ForeColor = Color.Firebrick, Padding = new Padding(12, 0, 12, 0) };
 
         _kaydetButonu = new Button { Text = "Bağlantıyı test et ve kaydet", AutoSize = true };
         _iptalButonu = new Button { Text = "İptal", AutoSize = true, DialogResult = DialogResult.Cancel };
@@ -117,7 +117,7 @@ public sealed class VeritabaniAyarFormu : Form
         {
             // Sifre yanlis, PostgreSQL kapali, adres yanlis... PostgreSQL'in kendi aciklamasi gosterilir.
             _gunlukcu.Hata(hata, "Veritabani baglanti testi basarisiz.");
-            DurumGoster("Bağlanılamadı: " + (hata.InnerException?.Message ?? hata.Message));
+            DurumGoster("Bağlanılamadı. " + DepoHatasiAciklayici.Acikla(hata));
         }
         catch (Exception hata) when (hata is IOException or UnauthorizedAccessException)
         {

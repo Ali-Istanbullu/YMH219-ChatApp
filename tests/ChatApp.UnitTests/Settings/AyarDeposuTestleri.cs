@@ -51,6 +51,29 @@ public sealed class AyarDeposuTestleri
     }
 
     [TestMethod]
+    public void CalisirkenSilinenDosya_YenidenOlusturulur_KlasorDahil()
+    {
+        var ayarlar = SunucuAyarlari.Varsayilan with { VeritabaniSifresi = "s" };
+        Depo().Kaydet(ayarlar);
+        Directory.Delete(_klasor, recursive: true);   // kullanici klasoru sildi
+
+        Depo().SilindiyseYenidenOlustur(ayarlar);
+
+        Assert.AreEqual(ayarlar, Depo().Yukle());
+        Assert.IsTrue(_gunlukcu.Satirlar.Any(s => s.Contains("yeniden olusturuldu")));
+    }
+
+    [TestMethod]
+    public void DosyaVarsa_SilindiyseYenidenOlustur_DokunmazHicbirSey()
+    {
+        Depo().Kaydet(SunucuAyarlari.Varsayilan with { DinlemePortu = 6000 });
+
+        Depo().SilindiyseYenidenOlustur(SunucuAyarlari.Varsayilan);
+
+        Assert.AreEqual(6000, Depo().Yukle()!.DinlemePortu);
+    }
+
+    [TestMethod]
     [DataRow("{ bozuk json")]
     [DataRow("{\"VeritabaniSunucusu\":\"a\",\"VeritabaniPortu\":1,\"VeritabaniAdi\":\"b\",\"VeritabaniKullanicisi\":\"c\",\"KorunmusSifre\":\"base64 degil!\",\"DinlemePortu\":2}")]
     public void BozukDosya_NullDoner_LogaYazilir(string icerik)

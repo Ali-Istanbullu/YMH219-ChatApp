@@ -138,6 +138,7 @@ public sealed class AnaForm : Form
     protected override async void OnShown(EventArgs e)
     {
         base.OnShown(e);
+        _ayarDeposu.SilindiyseYenidenOlustur(_ayarlar);
         _istatistikZamanlayici.Start();
         await ListeleriYenileAsync();
     }
@@ -161,6 +162,7 @@ public sealed class AnaForm : Form
 
     private void AboneliklerdenCik()
     {
+        _ayarDeposu.SilindiyseYenidenOlustur(_ayarlar);
         _istatistikZamanlayici.Stop();
         _istatistikZamanlayici.Dispose();
         _gunlukcu.SatirYazildi -= GunlukSatiriGeldi;
@@ -180,8 +182,8 @@ public sealed class AnaForm : Form
         }
         catch (DepoHatasi hata)
         {
-            Uyar(hata, "Sunucu başlatılamadı: veritabanına ulaşılamadı.\n" + (hata.InnerException?.Message ?? hata.Message) +
-                "\n\nPostgreSQL servisinin çalıştığını ve ayarları kontrol edin.");
+            Uyar(hata, "Sunucu başlatılamadı: veritabanına ulaşılamadı.\n" + DepoHatasiAciklayici.Acikla(hata) +
+                "\n\nAyarları \"Veritabanı ayarları...\" düğmesinden değiştirebilirsiniz.");
         }
         catch (SocketException hata)
         {
@@ -196,6 +198,7 @@ public sealed class AnaForm : Form
         {
             PortuKaydet(port);
         }
+        _ayarDeposu.SilindiyseYenidenOlustur(_ayarlar);
         DurumuGoster();
         await ListeleriYenileAsync();
     }
@@ -394,11 +397,11 @@ public sealed class AnaForm : Form
             if (sessiz)
             {
                 _gunlukcu.Hata(hata, "Pencere verileri okunamadi (veritabani).");
-                _istatistikYazisi.Text = "Veritabanına ulaşılamıyor: " + (hata.InnerException?.Message ?? hata.Message);
+                _istatistikYazisi.Text = "Veritabanına ulaşılamıyor: " + DepoHatasiAciklayici.Acikla(hata).Split('\n')[0];
             }
             else
             {
-                Uyar(hata, "Veritabanına ulaşılamadı: " + (hata.InnerException?.Message ?? hata.Message));
+                Uyar(hata, "Veritabanına ulaşılamadı.\n" + DepoHatasiAciklayici.Acikla(hata));
             }
         }
     }

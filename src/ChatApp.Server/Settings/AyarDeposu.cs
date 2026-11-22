@@ -65,6 +65,25 @@ public sealed class AyarDeposu
         File.Move(gecici, _dosyaYolu, overwrite: true);
     }
 
+    // Dosya calisirken silindiyse bellekteki ayarlardan yeniden yazar (bir dahaki acilista tekrar sorulmasin).
+    // Yazilamazsa sadece loga yazilir: sunucu calismaya devam eder.
+    public void SilindiyseYenidenOlustur(SunucuAyarlari ayarlar)
+    {
+        if (File.Exists(_dosyaYolu))
+        {
+            return;
+        }
+        try
+        {
+            Kaydet(ayarlar);
+            _gunlukcu.Uyari("Ayar dosyasi silinmisti, yeniden olusturuldu.");
+        }
+        catch (Exception hata) when (hata is IOException or UnauthorizedAccessException)
+        {
+            _gunlukcu.Hata(hata, "Silinen ayar dosyasi yeniden olusturulamadi.");
+        }
+    }
+
     // Diskteki bicim (sifre DPAPI ile sifrelenmis, base64).
     private sealed record AyarDosyasi(
         string VeritabaniSunucusu,
