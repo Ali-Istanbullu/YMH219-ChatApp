@@ -162,6 +162,27 @@ public sealed class PostgresDepoTestleri
     }
 
     [TestMethod]
+    public async Task Temizlik_EnEskileriSiler_TabloyuSikistirir_BoyutOlculur()
+    {
+        int ali = await HesapAcAsync(111111, "ali");
+        for (int i = 1; i <= 50; i++)
+        {
+            await _mesajlar.KaydetAsync(ali, null, $"mesaj {i}", Zaman.AddSeconds(i));
+        }
+        Assert.AreEqual(50, await _mesajlar.MesajSayisiAsync());
+        Assert.IsGreaterThan(0L, await _mesajlar.TabloBoyutuAsync());
+
+        Assert.AreEqual(30, await _mesajlar.EnEskileriSilAsync(20));
+        await _mesajlar.SikistirAsync();
+
+        IReadOnlyList<KayitliMesaj> kalan = await _mesajlar.GenelGecmisAsync(null, 100);
+        Assert.HasCount(20, kalan);
+        Assert.AreEqual("mesaj 50", kalan[0].Metin);
+        Assert.AreEqual("mesaj 31", kalan[^1].Metin);
+        Assert.AreEqual(0, await _mesajlar.EnEskileriSilAsync(1000));   // daha az mesaj varsa silmez
+    }
+
+    [TestMethod]
     public async Task UlasilamayanVeritabani_DepoHatasiVerir()
     {
         // Bos bir porta baglanmaya calis: beklenen hata DepoHatasi'na sarilmali.

@@ -58,6 +58,19 @@ public sealed class PostgresVeritabani : IAsyncDisposable
 
     internal NpgsqlDataSource Kaynak { get; }
 
+    // Pencereden girilen bilgilerden Npgsql baglanti dizesi kurar.
+    // Elle "Host=...;Password=..." birlestirilmez: sifrede ; veya = olursa bozulurdu.
+    public static string BaglantiDizesi(string sunucu, int port, string veritabani, string kullanici, string sifre) =>
+        new NpgsqlConnectionStringBuilder
+        {
+            Host = sunucu,
+            Port = port,
+            Database = veritabani,
+            Username = kullanici,
+            Password = sifre,
+            Timeout = 5   // saniye: PostgreSQL kapaliysa pencere uzun beklemesin
+        }.ConnectionString;
+
     // Baglantiyi dener ve tablolari olusturur. Ulasilamazsa DepoHatasi.
     public Task HazirlaAsync() => PostgresHataSarici.CalistirAsync(async () =>
     {

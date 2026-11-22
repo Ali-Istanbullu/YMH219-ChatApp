@@ -21,6 +21,17 @@ public interface IMesajDeposu
     // Genel oda mesajlari, en yeniden eskiye.
     Task<IReadOnlyList<KayitliMesaj>> GenelGecmisAsync(long? oncekiMesajId, int adet);
 
+    // Mesaj tablosunun diskte kapladigi yer (bayt, indeksler dahil).
+    Task<long> TabloBoyutuAsync();
+
+    Task<long> MesajSayisiAsync();
+
+    // En yeni "tutulacakAdet" mesaj kalir, daha eskiler silinir. Silinen sayiyi dondurur.
+    Task<long> EnEskileriSilAsync(long tutulacakAdet);
+
+    // Silinen satirlarin yerini diske geri verir (tablo dosyasi gercekten kuculur).
+    Task SikistirAsync();
+
     // Bu kisinin ozel mesajlastigi herkes (en son konusulan basta) ve okunmamis sayilari.
     Task<IReadOnlyList<SohbetOzeti>> SohbetleriGetirAsync(int kullaniciId);
 }

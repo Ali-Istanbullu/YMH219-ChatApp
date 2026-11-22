@@ -2,6 +2,7 @@
   <Folder Name="/src/">
     <Project Path="src/ChatApp.Protocol/ChatApp.Protocol.csproj" />
     <Project Path="src/ChatApp.Server/ChatApp.Server.csproj" />
+    <Project Path="src/ChatApp.Server.WinForms/ChatApp.Server.WinForms.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/ChatApp.SmokeTests/ChatApp.SmokeTests.csproj" />

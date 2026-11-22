@@ -23,7 +23,7 @@ public sealed class TestOrtami
         Hesaplar = new HesapServisi(Kullanicilar, Hashleyici, new GirisKilidi(Saat), Saat, Gunlukcu);
         Kisiler = new KisiServisi(Oturumlar, Kullanicilar, Mesajlar, Engeller, Saat, Gunlukcu);
         MesajServisi = new MesajServisi(Oturumlar, Kullanicilar, Mesajlar, Engeller, HizSinirlayici, Saat);
-        Yonetim = new YonetimServisi(Oturumlar, Kullanicilar, Davetler, Saat, Gunlukcu);
+        Yonetim = new YonetimServisi(Oturumlar, Kullanicilar, Davetler, Mesajlar, Saat, Gunlukcu);
         Isleyici = new PaketIsleyici(Oturumlar, Hesaplar, MesajServisi, Kisiler, HizSinirlayici, Gunlukcu);
     }
 

@@ -102,6 +102,38 @@ public sealed class PostgresMesajDeposu : IMesajDeposu
         return (IReadOnlyList<SohbetOzeti>)liste;
     });
 
+    public Task<long> TabloBoyutuAsync() => PostgresHataSarici.CalistirAsync(async () =>
+    {
+        await using NpgsqlCommand komut = _kaynak.CreateCommand("SELECT pg_total_relation_size('mesajlar')");
+        return (long)(await komut.ExecuteScalarAsync())!;
+    });
+
+    public Task<long> MesajSayisiAsync() => PostgresHataSarici.CalistirAsync(async () =>
+    {
+        await using NpgsqlCommand komut = _kaynak.CreateCommand("SELECT count(*) FROM mesajlar");
+        return (long)(await komut.ExecuteScalarAsync())!;
+    });
+
+    public Task<long> EnEskileriSilAsync(long tutulacakAdet) => PostgresHataSarici.CalistirAsync(async () =>
+    {
+        // Yeniden eskiye sirali listede "tutulacakAdet"inci mesajin numarasi bulunur; ondan eskiler silinir.
+        // Daha az mesaj varsa alt sorgu bos (NULL) doner ve hicbir sey silinmez.
+        await using NpgsqlCommand komut = _kaynak.CreateCommand("""
+            DELETE FROM mesajlar
+            WHERE id < (SELECT id FROM mesajlar ORDER BY id DESC OFFSET $1 - 1 LIMIT 1)
+            """);
+        komut.Parameters.Add(Parametre(Math.Max(tutulacakAdet, 1)));
+        return (long)await komut.ExecuteNonQueryAsync();
+    });
+
+    public Task SikistirAsync() => PostgresHataSarici.CalistirAsync(async () =>
+    {
+        // VACUUM FULL tabloyu yeniden yazar: dosya kuculur. Bu sirada tablo birkac saniye kilitlenir.
+        await using NpgsqlCommand komut = _kaynak.CreateCommand("VACUUM FULL mesajlar");
+        komut.CommandTimeout = 0;   // buyuk tabloda uzun surebilir; zaman asimi yok
+        await komut.ExecuteNonQueryAsync();
+    });
+
     private Task<IReadOnlyList<KayitliMesaj>> MesajlarAsync(string sql, params NpgsqlParameter[] parametreler) =>
         PostgresHataSarici.CalistirAsync(async () =>
         {

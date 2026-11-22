@@ -14,20 +14,23 @@ public sealed class YonetimServisi
     private readonly OturumYoneticisi _oturumlar;
     private readonly IKullaniciDeposu _kullanicilar;
     private readonly IDavetDeposu _davetler;
+    private readonly IMesajDeposu _mesajlar;
     private readonly ISaat _saat;
     private readonly IGunlukcu _gunlukcu;
 
     public YonetimServisi(OturumYoneticisi oturumlar, IKullaniciDeposu kullanicilar, IDavetDeposu davetler,
-        ISaat saat, IGunlukcu gunlukcu)
+        IMesajDeposu mesajlar, ISaat saat, IGunlukcu gunlukcu)
     {
         ArgumentNullException.ThrowIfNull(oturumlar);
         ArgumentNullException.ThrowIfNull(kullanicilar);
         ArgumentNullException.ThrowIfNull(davetler);
+        ArgumentNullException.ThrowIfNull(mesajlar);
         ArgumentNullException.ThrowIfNull(saat);
         ArgumentNullException.ThrowIfNull(gunlukcu);
         _oturumlar = oturumlar;
         _kullanicilar = kullanicilar;
         _davetler = davetler;
+        _mesajlar = mesajlar;
         _saat = saat;
         _gunlukcu = gunlukcu;
     }
@@ -107,5 +110,8 @@ public sealed class YonetimServisi
 
     public Task<IReadOnlyList<KullaniciKaydi>> YasaklilarAsync() => _kullanicilar.YasaklilariGetirAsync();
 
-    public Task<int> HesapSayisiAsync() => _kullanicilar.HesapSayisiAsync();
+    public async Task<SunucuIstatistigi> IstatistikAsync() => new(
+        await _kullanicilar.HesapSayisiAsync(),
+        await _mesajlar.MesajSayisiAsync(),
+        await _mesajlar.TabloBoyutuAsync());
 }

@@ -101,6 +101,43 @@ public sealed class BellekMesajDeposu : IMesajDeposu
         return liste;
     }
 
+    // Sahte boyut: her mesaj bu kadar bayt sayilir.
+    public const long MesajBasinaBayt = 250;
+
+    public int SikistirmaSayisi { get; private set; }
+
+    public Task<long> TabloBoyutuAsync()
+    {
+        lock (_kilit)
+        {
+            return Task.FromResult(_mesajlar.Count * MesajBasinaBayt);
+        }
+    }
+
+    public Task<long> MesajSayisiAsync()
+    {
+        lock (_kilit)
+        {
+            return Task.FromResult((long)_mesajlar.Count);
+        }
+    }
+
+    public Task<long> EnEskileriSilAsync(long tutulacakAdet)
+    {
+        lock (_kilit)
+        {
+            int silinecek = (int)Math.Max(0, _mesajlar.Count - Math.Max(tutulacakAdet, 1));
+            _mesajlar.RemoveRange(0, silinecek);   // liste eskiden yeniye sirali
+            return Task.FromResult((long)silinecek);
+        }
+    }
+
+    public Task SikistirAsync()
+    {
+        SikistirmaSayisi++;
+        return Task.CompletedTask;
+    }
+
     private Task<IReadOnlyList<KayitliMesaj>> Sec(Func<KayitliMesaj, bool> kosul, int adet)
     {
         lock (_kilit)
