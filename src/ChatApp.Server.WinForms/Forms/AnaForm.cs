@@ -143,6 +143,10 @@ public sealed class AnaForm : Form
     {
         base.OnShown(e);
         _ayarDeposu.SilindiyseYenidenOlustur(_ayarlar);
+
+        // Tablolar listeler okunmadan ONCE olusturulur (yeni kurulan veritabani bos gelir).
+        // Veritabanina ulasilamazsa alt satirda yazar; Başlat'a basinca tekrar denenir.
+        await VeritabaniIslemiAsync(_veritabani.HazirlaAsync, sessiz: true);
         _istatistikZamanlayici.Start();
         await ListeleriYenileAsync();
     }

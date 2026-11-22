@@ -13,6 +13,7 @@ public sealed class VeritabaniAyarFormu : Form
 {
     private readonly AyarDeposu _ayarDeposu;
     private readonly IGunlukcu _gunlukcu;
+    private readonly SunucuAyarlari _baslangic;
     private readonly int _dinlemePortu;
 
     private readonly TextBox _sunucuKutusu;
@@ -31,6 +32,7 @@ public sealed class VeritabaniAyarFormu : Form
         ArgumentNullException.ThrowIfNull(gunlukcu);
         _ayarDeposu = ayarDeposu;
         _gunlukcu = gunlukcu;
+        _baslangic = baslangic;
         _dinlemePortu = baslangic.DinlemePortu;
 
         Text = "ChatServer - Veritabanı ayarları";
@@ -90,6 +92,14 @@ public sealed class VeritabaniAyarFormu : Form
             _kullaniciKutusu.Text.Trim(),
             _sifreKutusu.Text,
             _dinlemePortu);
+        // Hazir veritabani kullaniliyorsa ve adres degismediyse hazir veritabani olmaya devam eder
+        // (ChatServer acilista onu baslatmaya devam etsin).
+        ayarlar = ayarlar with
+        {
+            GomuluVeritabani = _baslangic.GomuluVeritabani
+                && ayarlar.VeritabaniSunucusu == _baslangic.VeritabaniSunucusu
+                && ayarlar.VeritabaniPortu == _baslangic.VeritabaniPortu
+        };
 
         if (ayarlar.VeritabaniSunucusu.Length == 0 || ayarlar.VeritabaniAdi.Length == 0 || ayarlar.VeritabaniKullanicisi.Length == 0)
         {

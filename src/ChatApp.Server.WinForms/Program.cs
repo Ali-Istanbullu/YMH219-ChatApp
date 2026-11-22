@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using ChatApp.Server.Abstractions;
 using ChatApp.Server.Data;
+using ChatApp.Server.Gomulu;
 using ChatApp.Server.Network;
 using ChatApp.Server.Platform;
 using ChatApp.Server.Postgres;
@@ -18,7 +19,8 @@ namespace ChatApp.Server.WinForms;
 //  CHATSERVER BASLANGIC NOKTASI ve "KOMPOZISYON KOKU"
 //
 //   1) Genel hata yakalayici ve log
-//   2) Veritabani ayarlari: yoksa (ilk acilis) pencereden sorulur, test edilip kaydedilir
+//   2) Veritabani: ilk acilista "hazir veritabani" ya da "kendi PostgreSQL'im" secilir;
+//      hazir veritabani her acilista baslatilir, kapanista durdurulur
 //   3) Siniflar birbirine baglanir: DI container SADECE burada kurulur
 //   4) Pencere acilir; kapaninca servisler duzgun kapatilir
 // ================================================================================
@@ -64,16 +66,27 @@ internal static class Program
         var sirKoruyucu = new DpapiSirKoruyucu();
         var ayarDeposu = new AyarDeposu(UygulamaYollari.AyarDosyasi(), sirKoruyucu, gunlukcu);
 
+        string? pgBin = GomuluPostgres.BinKlasoruBul(AppContext.BaseDirectory);
         SunucuAyarlari? ayarlar = ayarDeposu.Yukle();
         if (ayarlar is null)
         {
-            // Ilk acilis (ya da ayar dosyasi bozuk): veritabani bilgileri sorulur.
-            using var ayarFormu = new VeritabaniAyarFormu(SunucuAyarlari.Varsayilan, ayarDeposu, gunlukcu);
-            if (ayarFormu.ShowDialog() != DialogResult.OK || ayarFormu.Ayarlar is null)
+            // Ilk acilis (ya da ayar dosyasi silinmis/bozuk): veritabani nereden gelsin?
+            using var ilkKurulum = new IlkKurulumFormu(ayarDeposu, gunlukcu, pgBin);
+            if (ilkKurulum.ShowDialog() != DialogResult.OK || ilkKurulum.Ayarlar is null)
             {
                 return false;   // kullanici vazgecti
             }
-            ayarlar = ayarFormu.Ayarlar;
+            ayarlar = ilkKurulum.Ayarlar;
+        }
+
+        GomuluPostgres? gomulu = null;
+        if (ayarlar.GomuluVeritabani)
+        {
+            (gomulu, ayarlar) = HazirVeritabaniniBaslat(pgBin, ayarlar, ayarDeposu, gunlukcu);
+            if (gomulu is null)
+            {
+                return false;
+            }
         }
 
         ServiceProvider servisler = ServisleriKur(ayarlar, gunlukcu, sirKoruyucu, ayarDeposu, UygulamaYollari.KokKlasor());
@@ -88,6 +101,69 @@ internal static class Program
             // Sunucu, veritabani baglantilari async kapanir. Arayuz dongusu bittigi icin
             // islem ayri is parcaciginda beklenir (arayuz is parcaciginda beklemek kilitlenebilir).
             Task.Run(async () => await servisler.DisposeAsync()).GetAwaiter().GetResult();
+            if (gomulu is not null)
+            {
+                HazirVeritabaniniDurdur(gomulu, gunlukcu);
+            }
+        }
+    }
+
+    // Hazir veritabanini baslatir. Klasoru silinmisse yeniden kurmayi teklif eder.
+    // Baslatilamazsa sebebi gosterir ve null dondurur (ChatServer acilmaz). Yeniden kurulduysa yeni ayarlar doner.
+    private static (GomuluPostgres? Gomulu, SunucuAyarlari Ayarlar) HazirVeritabaniniBaslat(string? pgBin,
+        SunucuAyarlari ayarlar, AyarDeposu ayarDeposu, SerilogGunlukcu gunlukcu)
+    {
+        if (pgBin is null)
+        {
+            MessageBox.Show("Hazır veritabanının PostgreSQL dosyaları bulunamadı. ChatServer'ı kurulum dosyasıyla yeniden kurun.",
+                GenelHataYakalayici.Baslik, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return (null, ayarlar);
+        }
+
+        var gomulu = new GomuluPostgres(pgBin, UygulamaYollari.VeritabaniKlasoru(), UygulamaYollari.PostgresLogDosyasi(), gunlukcu);
+        try
+        {
+            if (!gomulu.KuruluMu)
+            {
+                if (MessageBox.Show("Hazır veritabanı bulunamadı (klasörü silinmiş olabilir).\n\n" +
+                        "Yeni, boş bir veritabanı kurulsun mu? (Hesaplar ve mesajlar sıfırdan başlar.)",
+                        GenelHataYakalayici.Baslik, MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes)
+                {
+                    return (null, ayarlar);
+                }
+                SunucuAyarlari yeni = Task.Run(gomulu.KurAsync).GetAwaiter().GetResult();
+                ayarlar = yeni with { DinlemePortu = ayarlar.DinlemePortu };
+                ayarDeposu.Kaydet(ayarlar);
+            }
+            Task.Run(gomulu.BaslatAsync).GetAwaiter().GetResult();
+            return (gomulu, ayarlar);
+        }
+        catch (GomuluVeritabaniHatasi hata)
+        {
+            gunlukcu.Hata(hata, $"Hazir veritabani baslatilamadi. {hata.Ayrinti}");
+            MessageBox.Show($"Veritabanı başlatılamadı: {hata.Message}\n\nAyrıntı: logs\\chatserver.log ve logs\\postgres.log",
+                GenelHataYakalayici.Baslik, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return (null, ayarlar);
+        }
+        catch (Exception hata) when (hata is IOException or UnauthorizedAccessException)
+        {
+            gunlukcu.Hata(hata, "Hazir veritabani ayarlari yazilamadi.");
+            MessageBox.Show("Veritabanı ayarları kaydedilemedi: " + hata.Message,
+                GenelHataYakalayici.Baslik, MessageBoxButtons.OK, MessageBoxIcon.Error);
+            return (null, ayarlar);
+        }
+    }
+
+    private static void HazirVeritabaniniDurdur(GomuluPostgres gomulu, SerilogGunlukcu gunlukcu)
+    {
+        try
+        {
+            Task.Run(gomulu.DurdurAsync).GetAwaiter().GetResult();
+        }
+        catch (GomuluVeritabaniHatasi hata)
+        {
+            // Kapanista durdurulamadiysa bir dahaki acilista calisir halde bulunur ve kullanilir; sorun degil.
+            gunlukcu.Hata(hata, $"Hazir veritabani durdurulamadi. {hata.Ayrinti}");
         }
     }
 

@@ -39,7 +39,7 @@ public sealed class AyarDeposu
                 ?? throw new JsonException("Ayar dosyasi bos.");
             string sifre = Encoding.UTF8.GetString(_sirKoruyucu.Coz(Convert.FromBase64String(dosya.KorunmusSifre)));
             return new SunucuAyarlari(dosya.VeritabaniSunucusu, dosya.VeritabaniPortu, dosya.VeritabaniAdi,
-                dosya.VeritabaniKullanicisi, sifre, dosya.DinlemePortu);
+                dosya.VeritabaniKullanicisi, sifre, dosya.DinlemePortu, dosya.GomuluVeritabani);
         }
         catch (Exception hata) when (hata is IOException or UnauthorizedAccessException or JsonException
                                          or FormatException or CryptographicException)
@@ -56,7 +56,7 @@ public sealed class AyarDeposu
         ArgumentNullException.ThrowIfNull(ayarlar);
         byte[] korunmus = _sirKoruyucu.Koru(Encoding.UTF8.GetBytes(ayarlar.VeritabaniSifresi));
         var dosya = new AyarDosyasi(ayarlar.VeritabaniSunucusu, ayarlar.VeritabaniPortu, ayarlar.VeritabaniAdi,
-            ayarlar.VeritabaniKullanicisi, Convert.ToBase64String(korunmus), ayarlar.DinlemePortu);
+            ayarlar.VeritabaniKullanicisi, Convert.ToBase64String(korunmus), ayarlar.DinlemePortu, ayarlar.GomuluVeritabani);
 
         // Once gecici dosyaya yaz, sonra yerine koy: yazarken elektrik kesilirse eski dosya bozulmaz.
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(_dosyaYolu))!);
@@ -91,5 +91,6 @@ public sealed class AyarDeposu
         string VeritabaniAdi,
         string VeritabaniKullanicisi,
         string KorunmusSifre,
-        int DinlemePortu);
+        int DinlemePortu,
+        bool GomuluVeritabani = false);   // eski ayar dosyalarinda yok: false
 }

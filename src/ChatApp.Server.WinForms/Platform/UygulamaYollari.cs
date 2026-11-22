@@ -2,6 +2,7 @@ namespace ChatApp.Server.WinForms.Platform;
 
 // ChatServer'in dosyalari: %LocalAppData%\ChatServer
 //   ayarlar.json              veritabani ayarlari (sifre DPAPI ile sifreli)
+//   veritabani\               hazir veritabani (ChatServer'in kendi PostgreSQL'i); kaldirinca KALIR
 //   sunucu-sertifikasi.dat    TLS sertifikasi (DPAPI ile sifreli)
 //   logs\chatserver*.log      log (1 MB x 5)
 // Program klasorune yazilmaz. Klasor silinirse her istekte yeniden olusturulur.
@@ -16,6 +17,11 @@ public static class UygulamaYollari
     }
 
     public static string AyarDosyasi() => Path.Combine(KokKlasor(), "ayarlar.json");
+
+    // initdb klasoru kendisi olusturur; burada olusturulmaz.
+    public static string VeritabaniKlasoru() => Path.Combine(KokKlasor(), "veritabani");
+
+    public static string PostgresLogDosyasi() => Path.Combine(KokKlasor(), "logs", "postgres.log");
 
     public static string GunlukDosyasi()
     {

@@ -44,6 +44,19 @@ public sealed class AyarDeposuTestleri
     }
 
     [TestMethod]
+    public void HazirVeritabaniBilgisi_Saklanir_EskiDosyadaYoksaFalse()
+    {
+        Depo().Kaydet(SunucuAyarlari.Varsayilan with { VeritabaniSifresi = "s", GomuluVeritabani = true });
+        Assert.IsTrue(Depo().Yukle()!.GomuluVeritabani);
+
+        // Hazir veritabani ozelliginden onceki surumun yazdigi dosya.
+        var json = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(_dosya))!.AsObject();
+        Assert.IsTrue(json.Remove("GomuluVeritabani"));
+        File.WriteAllText(_dosya, json.ToJsonString());
+        Assert.IsFalse(Depo().Yukle()!.GomuluVeritabani);
+    }
+
+    [TestMethod]
     public void Sifre_DosyayaAcikYazilmaz()
     {
         Depo().Kaydet(SunucuAyarlari.Varsayilan with { VeritabaniSifresi = "CokGizliSifre" });
