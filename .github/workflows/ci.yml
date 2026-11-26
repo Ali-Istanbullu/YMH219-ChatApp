@@ -2,6 +2,8 @@
 # Birim ve smoke testleri basarisizsa build kirmizi olur.
 # Smoke testleri GERCEK PostgreSQL kullanir: GitHub'in Windows sunucularinda PostgreSQL hazir kurulu gelir
 # (servisi kapali, kullanici postgres / sifre root); burada baslatilip test veritabani olusturulur.
+# Tek is (job): derleme bir kez yapilir. Derleme basariliysa test adimlarinin HEPSI calisir; biri kirmizi olsa da
+# digerleri calisir ve sonuclari gorunur (job sonunda yine kirmizi olur).
 name: CI
 
 on:
@@ -23,12 +25,16 @@ jobs:
         run: dotnet restore
 
       - name: Derle
+        id: derle
         run: dotnet build --no-restore -c Release
 
       - name: Birim testleri
+        if: ${{ !cancelled() && steps.derle.outcome == 'success' }}
         run: dotnet test tests/ChatApp.UnitTests --no-build -c Release
 
       - name: PostgreSQL'i baslat ve test veritabanini olustur
+        id: postgres
+        if: ${{ !cancelled() && steps.derle.outcome == 'success' }}
         shell: pwsh
         env:
           PGPASSWORD: root
@@ -48,9 +54,11 @@ jobs:
           "CHATAPP_PG_BIN=$env:PGBIN" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Smoke testleri (PostgreSQL, hazir veritabani, exe'ler acilip kapaniyor mu)
+        if: ${{ !cancelled() && steps.derle.outcome == 'success' && steps.postgres.outcome == 'success' }}
         run: dotnet test tests/ChatApp.SmokeTests --no-build -c Release
 
       # Bulut sunucusunun hizi degisken: performans testi kirmizi olsa da build kirilmaz, sonuc ciktida gorunur.
       - name: Performans testleri
+        if: ${{ !cancelled() && steps.derle.outcome == 'success' }}
         continue-on-error: true
         run: dotnet test tests/ChatApp.PerformanceTests --no-build -c Release --logger "console;verbosity=detailed"
